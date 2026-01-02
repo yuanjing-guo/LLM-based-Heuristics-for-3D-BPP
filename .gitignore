@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Conda / venv
+.env
+.venv
+conda-env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Mujoco / robosuite cache
+mjkey.txt
+
+# Logs & results
+logs/
+results/
+video/
+
+# Checkpoints / models
+*.zip
+*.pt
+*.pth
+*.ckpt
+
+# Local config
+*.npy
+
+# Editor
+.vscode/
+.idea/
