@@ -7,7 +7,7 @@ conda env create -f environment.yaml
 conda activate palletization
 ```
 
-### 1.1 Create Conda Environment
+### 1.2 Test
 
 Run:
 ```
@@ -30,8 +30,6 @@ Step-wise logs are printed to the terminal
 A rollout video is saved automatically
 
 ## 3. Project Structure
-arduino
-Copy code
 ```
 .
 ├── assets
@@ -109,4 +107,4 @@ Use offscreen rendering
 ## 7. Notes
 This repository is intended as a shared experimental platform.  
 Please keep changes modular and avoid breaking existing heuristics.  
-Built and tested under Ubuntu 22.04
+Built and tested on Ubuntu 22.04
