@@ -7,7 +7,7 @@ conda env create -f environment.yaml
 conda activate palletization
 ```
 
-### 1.1 Create Conda Environment
+### 1.2 Test
 
 Run:
 ```
