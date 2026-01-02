@@ -30,8 +30,6 @@ Step-wise logs are printed to the terminal
 A rollout video is saved automatically
 
 ## 3. Project Structure
-arduino
-Copy code
 ```
 .
 ├── assets
