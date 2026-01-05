@@ -38,15 +38,14 @@ def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
         util = float(info.get("util_current", 0.0))
         last_util = util
 
-    #     print(
-    #         f"step={step:02d}, util={util:.4f}, "
-    #         f"V_boxes={info.get('V_boxes_bins3', 0):.0f}, "
-    #         f"V_env_hm={info.get('V_env_hm_bins3', 0):.0f}, "
-    #         f"hmax={info.get('hmax_bins', 0):.0f}, "
-    #         f"footprint={info.get('footprint_bins2', 0):.0f}, "
-    #         f"placed={len(env.env.boxes_on_pallet_id)}, "
-    #         f"term={info.get('termination_reason', -1)}"
-    #     )
+        print(f"step={step:02d}")
+        #     f"V_boxes={info.get('V_boxes_bins3', 0):.0f}, "
+        #     f"V_env_hm={info.get('V_env_hm_bins3', 0):.0f}, "
+        #     f"hmax={info.get('hmax_bins', 0):.0f}, "
+        #     f"footprint={info.get('footprint_bins2', 0):.0f}, "
+        #     f"placed={len(env.env.boxes_on_pallet_id)}, "
+        #     f"term={info.get('termination_reason', -1)}"
+        # )
 
     # print(f"[{heuristic.name}] Finished. final_util={last_util:.4f}")
 
