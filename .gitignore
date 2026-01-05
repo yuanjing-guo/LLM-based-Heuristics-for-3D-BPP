@@ -27,8 +27,8 @@ video/
 *.pth
 *.ckpt
 
-# Local config
-*.npy
+# # Local config
+# *.npy
 
 # Editor
 .vscode/

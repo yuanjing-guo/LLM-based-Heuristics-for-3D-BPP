@@ -286,7 +286,7 @@ class BoxPlanning(SingleArmEnv):
         mujoco_arena.set_origin([0, 0, 0])
 
         # Boxes
-        if self.init_box_pose_path is not None:
+        if self.init_box_pose_path is None:
             self._load_boxes_from_recorded_pose()
         else:
             self._load_boxes_random_pose()
