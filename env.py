@@ -5,9 +5,10 @@
 # - STRICT: if any part of box would exceed pallet boundary -> raise RuntimeError.
 #
 # Reward (UPDATED):
-#   reward = space utilization = (total placed box volume) / (outer envelope volume)
-#   where "outer envelope" is the axis-aligned bounding box (AABB) of the entire placed pile.
-#   This envelope includes voids / unusable space (between boxes, under bridges, etc.) by design.
+#   - Use FINAL heightmap-envelope utilization as reward:
+#       util = V_boxes / V_envelope_hm
+#     where V_envelope_hm is computed from heightmap envelope of current pallet occupancy.
+#   - Per-step reward = 0, only terminal reward = util (success or failure termination).
 
 import copy
 import os
@@ -48,7 +49,7 @@ def resolve_video_path(path: Optional[str]) -> Optional[str]:
     return f"{base}__{timestamp}{ext}"
 
 
-# 6 possible axis orders (same semantics as your original code)
+# 6 possible axis orders
 # order is used like: rotated_size = size[order]
 ORDERS = {
     0: np.array([0, 1, 2], dtype=int),
@@ -82,6 +83,55 @@ def quat_xyzw_from_order(order_id: int) -> np.ndarray:
 
     # robosuite T.mat2quat returns xyzw
     return T.mat2quat(rotm).astype(np.float32)
+
+
+def compute_utilization_heightmap(pallet_obs_density: np.ndarray) -> Dict[str, float]:
+    """
+    Heightmap-envelope utilization (discrete bin world).
+
+    pallet_obs_density shape: (X, Y, H)
+      >0 means occupied (stored density value)
+      =0 means empty
+
+    Define:
+      occ(x,y,z) = pallet_obs_density>0
+      h(x,y) = highest occupied z + 1, else 0
+      V_boxes = sum(occ)
+      V_env_hm = sum(h)   # heightmap envelope volume
+      util = V_boxes / V_env_hm
+
+    Returns a dict of metrics (all in bins, except util).
+    """
+    if pallet_obs_density.ndim != 3:
+        raise ValueError(f"pallet_obs_density must be (X,Y,H), got {pallet_obs_density.shape}")
+
+    X, Y, H = pallet_obs_density.shape
+    occ = pallet_obs_density > 0
+    has = occ.any(axis=2)  # (X,Y) bool
+
+    # heightmap: h(x,y) = max_z+1 if any occupied, else 0
+    # compute "first occupied from top" using reversed z
+    occ_rev = occ[..., ::-1]
+    first_from_top = occ_rev.argmax(axis=2)  # (X,Y), valid even if all-False (returns 0)
+    hmap = np.where(has, H - first_from_top, 0).astype(np.int32)  # (X,Y)
+
+    V_boxes = float(occ.sum())               # bins^3
+    V_env_hm = float(hmap.sum())             # bins^3
+    util = float(V_boxes / max(V_env_hm, 1.0))
+
+    footprint = float(has.sum())             # bins^2 (optional debug)
+    hmax = float(hmap.max()) if hmap.size > 0 else 0.0
+
+    return {
+        "util": util,
+        "V_boxes_bins3": V_boxes,
+        "V_env_hm_bins3": V_env_hm,
+        "footprint_bins2": footprint,
+        "hmax_bins": hmax,
+        "X": float(X),
+        "Y": float(Y),
+        "H": float(H),
+    }
 
 
 # ---------------------------
@@ -140,10 +190,6 @@ class BoxPlanning(SingleArmEnv):
             self.writer = imageio.get_writer(final_video_path, fps=control_freq)
             print(f"[Video] Saving to: {final_video_path}")
 
-        # --- utilization bookkeeping (initialized here; reset/reinit will clear) ---
-        self.placed_aabbs = []          # list of dict(x,y,z,dx,dy,dz) in bins
-        self.total_box_volume_bins = 0  # sum(dx*dy*dz) in bins^3
-
         super().__init__(
             robots=["Panda"],
             controller_configs=controller_configs,
@@ -155,6 +201,41 @@ class BoxPlanning(SingleArmEnv):
             control_freq=control_freq,
             ignore_done=ignore_done,
         )
+
+    # ---------------------------
+    # Util logging helpers (NEW, additive only)
+    # ---------------------------
+
+    def _get_current_util_metrics(self) -> Dict[str, float]:
+        """Compute util metrics from CURRENT committed pallet occupancy (obs['pallet_obs_density'])."""
+        return compute_utilization_heightmap(self.obs["pallet_obs_density"])
+
+    def _inject_current_util_into_info(self, info: Dict) -> Dict:
+        """
+        Add current util metrics into info without breaking original keys.
+        We expose:
+          - util_current
+          - V_boxes_bins3, V_env_hm_bins3, footprint_bins2, hmax_bins
+        """
+        metrics = self._get_current_util_metrics()
+        # keep original 'util' key if it already exists (terminal reward_func adds it)
+        # but always provide util_current for per-step logging
+        info.setdefault("V_boxes_bins3", metrics["V_boxes_bins3"])
+        info.setdefault("V_env_hm_bins3", metrics["V_env_hm_bins3"])
+        info.setdefault("footprint_bins2", metrics["footprint_bins2"])
+        info.setdefault("hmax_bins", metrics["hmax_bins"])
+        info["util_current"] = float(metrics["util"])
+        return info
+
+    def _print_step_util(self, info: Dict):
+        """Per-step util print (requested)."""
+        util = float(info.get("util_current", 0.0))
+        vb = float(info.get("V_boxes_bins3", 0.0))
+        ve = float(info.get("V_env_hm_bins3", 0.0))
+        hm = float(info.get("hmax_bins", 0.0))
+        fp = float(info.get("footprint_bins2", 0.0))
+        term = int(info.get("termination_reason", -1))
+        print(f"[UtilStep] util={util:.4f} V_boxes={vb:.0f} V_env_hm={ve:.0f} hmax={hm:.0f} footprint={fp:.0f} term={term}")
 
     # ---------------------------
     # Model construction
@@ -325,6 +406,8 @@ class BoxPlanning(SingleArmEnv):
         dx = int(box_size_after_rotate[0])
         dy = int(box_size_after_rotate[1])
 
+        # Correct strict bound:
+        #   x+dx <= X, y+dy <= Y
         if (x + dx > X) or (y + dy > Y):
             raise RuntimeError(
                 f"[OutOfBounds] Box would exceed pallet boundary: "
@@ -341,7 +424,12 @@ class BoxPlanning(SingleArmEnv):
 
         target_x = self.pallet_position[0] - self.pallet_size[0] / 2 + x * self.bin_size + dx * self.bin_size / 2
         target_y = self.pallet_position[1] - self.pallet_size[1] / 2 + y * self.bin_size + dy * self.bin_size / 2
-        target_z = self.pallet_position[2] + self.pallet_size[2] / 2 + z * self.bin_size + int(box_size_after_rotate[2]) * self.bin_size / 2
+        target_z = (
+            self.pallet_position[2]
+            + self.pallet_size[2] / 2
+            + z * self.bin_size
+            + int(box_size_after_rotate[2]) * self.bin_size / 2
+        )
 
         target_pos = np.array([target_x, target_y, target_z], dtype=np.float32)
         return target_pos, (x, y, z)
@@ -409,49 +497,8 @@ class BoxPlanning(SingleArmEnv):
         }
 
     # ---------------------------
-    # Reward (UPDATED: utilization)
+    # Reward (UPDATED)
     # ---------------------------
-
-    def _envelope_volume_bins(self) -> Tuple[int, Dict[str, int]]:
-        """
-        Axis-aligned outer envelope volume in discrete bins.
-        Envelope = AABB that tightly bounds all placed boxes in (x,y,z) grid.
-        Includes all voids inside the prism as "wasted" space (your definition).
-        """
-        if not self.placed_aabbs:
-            return 0, {"xmin": 0, "xmax": 0, "ymin": 0, "ymax": 0, "zmin": 0, "zmax": 0}
-
-        xmin = min(b["x"] for b in self.placed_aabbs)
-        ymin = min(b["y"] for b in self.placed_aabbs)
-        zmin = min(b["z"] for b in self.placed_aabbs)
-
-        xmax = max(b["x"] + b["dx"] for b in self.placed_aabbs)
-        ymax = max(b["y"] + b["dy"] for b in self.placed_aabbs)
-        zmax = max(b["z"] + b["dz"] for b in self.placed_aabbs)
-
-        vol = int(max(0, xmax - xmin) * max(0, ymax - ymin) * max(0, zmax - zmin))
-        bounds = {
-            "xmin": int(xmin), "xmax": int(xmax),
-            "ymin": int(ymin), "ymax": int(ymax),
-            "zmin": int(zmin), "zmax": int(zmax),
-        }
-        return vol, bounds
-
-    def _utilization(self) -> Tuple[float, Dict]:
-        """
-        Utilization = total_box_volume / envelope_volume (both in bins^3).
-        """
-        env_vol, bounds = self._envelope_volume_bins()
-        total_vol = int(self.total_box_volume_bins)
-        util = float(total_vol) / float(env_vol) if env_vol > 0 else 0.0
-
-        info = {
-            "utilization": float(util),
-            "total_box_volume_bins": int(total_vol),
-            "envelope_volume_bins": int(env_vol),
-        }
-        info.update(bounds)
-        return float(util), info
 
     def reward_func(self, termination_reason: int) -> Tuple[float, Dict]:
         """
@@ -461,21 +508,21 @@ class BoxPlanning(SingleArmEnv):
             3 -> success (placed all)
             4 -> invalid action (picked empty buffer slot)
 
-        Reward:
-            utilization = total_box_volume / envelope_volume
+        Reward policy (UPDATED):
+          - ongoing: reward = 0
+          - invalid action: reward = 0 (episode continues)
+          - terminal (2 or 3): reward = final utilization (heightmap envelope)
         """
-        if termination_reason in (0, 3):
-            r, util_info = self._utilization()
+        info: Dict[str, float] = {"termination_reason": int(termination_reason)}
+
+        if termination_reason in (2, 3):
+            metrics = compute_utilization_heightmap(self.obs["pallet_obs_density"])
+            r = float(metrics["util"])
+            info.update(metrics)  # util, V_boxes_bins3, V_env_hm_bins3, footprint, hmax...
         else:
             r = 0.0
-            util_info = {
-                "utilization": 0.0,
-                "total_box_volume_bins": int(self.total_box_volume_bins),
-                "envelope_volume_bins": 0,
-            }
 
-        info = {"termination_reason": int(termination_reason)}
-        info.update(util_info)
+        info["reward_util_final"] = float(r)
         return float(r), info
 
     # ---------------------------
@@ -488,7 +535,6 @@ class BoxPlanning(SingleArmEnv):
         - If recorded init poses exist, teleport boxes back to their init pose.
         - Shuffle the order of unplaced boxes (affects buffer ordering).
         - Clear pallet occupancy.
-        - Reset utilization bookkeeping.
         """
         self._reset_boxes_to_init_pose_if_available()
 
@@ -503,11 +549,6 @@ class BoxPlanning(SingleArmEnv):
 
         self.boxes_on_pallet_id = []
         self.boxes_on_pallet_target_pose = {}
-
-        # --- utilization bookkeeping reset ---
-        self.placed_aabbs = []
-        self.total_box_volume_bins = 0
-
         return self.obs
 
     def _reset_boxes_to_init_pose_if_available(self):
@@ -539,6 +580,11 @@ class BoxPlanning(SingleArmEnv):
             done = False
             self.save_frame()
             info["record_data"] = None
+
+            # NEW: add + print current util every step
+            info = self._inject_current_util_into_info(info)
+            self._print_step_util(info)
+
             return self.obs, reward, done, info
 
         # 2) resolve box id & properties
@@ -553,6 +599,7 @@ class BoxPlanning(SingleArmEnv):
         order = ORDERS[int(np.clip(rot_id, 0, 5))]
         target_quat = quat_xyzw_from_order(rot_id)
         size_after_rotate = box_size[order]
+        self._last_order_debug = order
 
         # 4) record state before placing
         record_data = self.record_pallet(box_id, rot_id, target_quat, size_after_rotate)
@@ -560,7 +607,6 @@ class BoxPlanning(SingleArmEnv):
         # 5) decode x,y and compute z (strict bounds)
         target_pos, (x, y, z) = self.get_target_position_strict(action, size_after_rotate)
 
-        # Debug print: order + placement (discrete)
         print(
             f"[StepDebug] rot_id={int(rot_id)} "
             f"order={order.tolist()} "
@@ -577,16 +623,25 @@ class BoxPlanning(SingleArmEnv):
         is_stable = self.check_stable() and (np.linalg.norm(cur_pos - target_pos) < self.stable_thres)
 
         if not is_stable:
-            reward, info = self.reward_func(termination_reason=2)
+            reward, info = self.reward_func(termination_reason=2)  # FINAL util on current committed pallet
             done = True
             self.save_frame()
             info["record_data"] = record_data
             info["chosen_discrete"] = {
                 "box_buffer_index": int(box_slot),
                 "rot_id": int(rot_id),
-                "x": int(x), "y": int(y), "z": int(z),
+                "x": int(x),
+                "y": int(y),
+                "z": int(z),
             }
             info["box_density"] = float(box_density)
+
+            # NEW: add + print current util every step (including terminal)
+            info = self._inject_current_util_into_info(info)
+            self._print_step_util(info)
+            # NEW: final util print at terminal
+            print(f"[FinalUtil] util={float(info.get('util_current', 0.0)):.4f}")
+
             return self.obs, reward, done, info
 
         # --- Commit placement ---
@@ -599,18 +654,14 @@ class BoxPlanning(SingleArmEnv):
         x2, y2, z2 = x + dx, y + dy, z + dz
         self.obs["pallet_obs_density"][x:x2, y:y2, z:z2] = float(box_density)
 
-        # --- utilization bookkeeping update (NEW) ---
-        self.placed_aabbs.append(
-            {"x": int(x), "y": int(y), "z": int(z), "dx": int(dx), "dy": int(dy), "dz": int(dz)}
-        )
-        self.total_box_volume_bins += int(dx * dy * dz)
-
         # Update buffer
         self.update_obs_buffer()
 
         # Episode termination
         done = (len(self.boxes_on_pallet_id) == self.total_box_number)
         term_reason = 3 if done else 0
+
+        # Reward: only final util at terminal
         reward, info = self.reward_func(term_reason)
 
         # Video
@@ -621,9 +672,20 @@ class BoxPlanning(SingleArmEnv):
         info["chosen_discrete"] = {
             "box_buffer_index": int(box_slot),
             "rot_id": int(rot_id),
-            "x": int(x), "y": int(y), "z": int(z),
+            "x": int(x),
+            "y": int(y),
+            "z": int(z),
         }
         info["box_density"] = float(box_density)
+
+        # NEW: add + print current util every step
+        info = self._inject_current_util_into_info(info)
+        self._print_step_util(info)
+
+        # NEW: final util print at success terminal
+        if term_reason == 3:
+            print(f"[FinalUtil] util={float(info.get('util_current', 0.0)):.4f}")
+
         return self.obs, reward, done, info
 
 
@@ -782,12 +844,14 @@ if __name__ == "__main__":
         obs, reward, done, trunc, info = env.step(action)
         step_count += 1
 
-        # utilization debug
-        print(
-            f"[Util] step={step_count:02d} reward(util)={reward:.4f} "
-            f"util={info.get('utilization', 0.0):.4f} "
-            f"total_vol={info.get('total_box_volume_bins', 0)} "
-            f"env_vol={info.get('envelope_volume_bins', 0)}"
-        )
-
+    # final metrics
+    metrics = compute_utilization_heightmap(env.env.obs["pallet_obs_density"])
     print("Finished. Steps:", step_count, "Done:", done)
+    print(
+        "[FinalUtil]",
+        f"util={metrics['util']:.4f}",
+        f"V_boxes={metrics['V_boxes_bins3']:.0f}",
+        f"V_env_hm={metrics['V_env_hm_bins3']:.0f}",
+        f"hmax={metrics['hmax_bins']:.0f}",
+        f"footprint={metrics['footprint_bins2']:.0f}",
+    )

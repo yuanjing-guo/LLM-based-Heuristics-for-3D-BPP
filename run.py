@@ -25,31 +25,37 @@ def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
     if hasattr(heuristic, "reset"):
         heuristic.reset()
 
-    total_reward = 0.0
     step = 0
     done = False
+    last_util = 0.0
 
     while (not done) and (step < max_steps):
         action = heuristic(obs)
         obs, reward, done, trunc, info = env.step(action)
 
-        total_reward += float(reward)
         step += 1
 
-        print(
-            f"step={step:02d}, reward={reward:.3f}, "
-            f"placed={len(env.env.boxes_on_pallet_id)}, "
-            f"term={info.get('termination_reason', -1)}"
-        )
+        util = float(info.get("util_current", 0.0))
+        last_util = util
 
-    print(f"[{heuristic.name}] Finished. total_reward={total_reward:.3f}")
+    #     print(
+    #         f"step={step:02d}, util={util:.4f}, "
+    #         f"V_boxes={info.get('V_boxes_bins3', 0):.0f}, "
+    #         f"V_env_hm={info.get('V_env_hm_bins3', 0):.0f}, "
+    #         f"hmax={info.get('hmax_bins', 0):.0f}, "
+    #         f"footprint={info.get('footprint_bins2', 0):.0f}, "
+    #         f"placed={len(env.env.boxes_on_pallet_id)}, "
+    #         f"term={info.get('termination_reason', -1)}"
+    #     )
+
+    # print(f"[{heuristic.name}] Finished. final_util={last_util:.4f}")
 
     # Graceful cleanup (reduces EGL warnings)
     if hasattr(env.env, "writer") and env.env.writer is not None:
         env.env.writer.close()
     del env
 
-    return float(total_reward)
+    return float(last_util)
 
 
 # ------------------------------------------------------------
@@ -69,17 +75,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     heuristic_cls = HEURISTIC_REGISTRY[args.heuristic]
-
-    # IMPORTANT:
-    # This assumes your heuristics now read TaskConfig via BaseHeuristic,
-    # so they can be constructed with no dimension args:
-    #
-    # class FloorBuilding(BaseHeuristic):
-    #     name = "floor_building"
-    #     def __init__(self):
-    #         super().__init__()
-    #         ...
-    #
     heuristic = heuristic_cls()
 
     print(f"[Run] Heuristic = {heuristic.name}")
