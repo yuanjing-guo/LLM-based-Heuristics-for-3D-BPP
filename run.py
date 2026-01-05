@@ -1,12 +1,9 @@
+# run.py
 import argparse
-import numpy as np
 
 from env import BoxPlanningEnvWrapper
-
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
-from helpers.task_config import TaskConfig
-# from heuristics.llm_based import LLMHeuristic
 
 
 # ------------------------------------------------------------
@@ -14,36 +11,35 @@ from helpers.task_config import TaskConfig
 # ------------------------------------------------------------
 HEURISTIC_REGISTRY = {
     "largest_volume_lowest_z": LargestVolumeLowestZ,
-    "floor_building": FloorBuilding
-    # "llm_v1": LLMHeuristic,
+    "floor_building": FloorBuilding,
 }
 
 
 # ------------------------------------------------------------
 # Run one episode
 # ------------------------------------------------------------
-def run_episode(heuristic, max_steps=200, seed=0):
-    env = BoxPlanningEnvWrapper(
-        save_video_path=f"video/{heuristic.name}.mp4"
-    )
+def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
+    env = BoxPlanningEnvWrapper(save_video_path=f"video/{heuristic.name}.mp4")
 
     obs, _ = env.reset(seed=seed)
+    if hasattr(heuristic, "reset"):
+        heuristic.reset()
 
     total_reward = 0.0
     step = 0
     done = False
 
-    while not done and step < max_steps:
+    while (not done) and (step < max_steps):
         action = heuristic(obs)
         obs, reward, done, trunc, info = env.step(action)
 
-        total_reward += reward
+        total_reward += float(reward)
         step += 1
 
         print(
             f"step={step:02d}, reward={reward:.3f}, "
             f"placed={len(env.env.boxes_on_pallet_id)}, "
-            f"term={info['termination_reason']}"
+            f"term={info.get('termination_reason', -1)}"
         )
 
     print(f"[{heuristic.name}] Finished. total_reward={total_reward:.3f}")
@@ -53,7 +49,7 @@ def run_episode(heuristic, max_steps=200, seed=0):
         env.env.writer.close()
     del env
 
-    return total_reward
+    return float(total_reward)
 
 
 # ------------------------------------------------------------
@@ -68,37 +64,23 @@ if __name__ == "__main__":
         choices=HEURISTIC_REGISTRY.keys(),
         help="Which heuristic to run",
     )
-    parser.add_argument(
-        "--max_steps",
-        type=int,
-        default=200,
-        help="Maximum steps per episode",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-        help="Random seed",
-    )
-
+    parser.add_argument("--max_steps", type=int, default=200)
+    parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
-    # --------------------------------------------------------
-    # Build env once to query dimensions
-    # --------------------------------------------------------
-    dummy_env = BoxPlanningEnvWrapper()
     heuristic_cls = HEURISTIC_REGISTRY[args.heuristic]
 
-    heuristic = heuristic_cls(
-        N_visible_boxes=dummy_env.N_visible_boxes,
-        pallet_size_discrete=dummy_env.pallet_size_discrete,
-        max_pallet_height=dummy_env.env.max_pallet_height,
-        bin_size=TaskConfig.bin_size,
-    )
+    # IMPORTANT:
+    # This assumes your heuristics now read TaskConfig via BaseHeuristic,
+    # so they can be constructed with no dimension args:
+    #
+    # class FloorBuilding(BaseHeuristic):
+    #     name = "floor_building"
+    #     def __init__(self):
+    #         super().__init__()
+    #         ...
+    #
+    heuristic = heuristic_cls()
 
     print(f"[Run] Heuristic = {heuristic.name}")
-    run_episode(
-        heuristic,
-        max_steps=args.max_steps,
-        seed=args.seed,
-    )
+    run_episode(heuristic, max_steps=args.max_steps, seed=args.seed)

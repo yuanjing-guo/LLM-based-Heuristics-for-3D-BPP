@@ -1,133 +1,98 @@
+# heuristics/floor_building.py
 import numpy as np
 
 from heuristics.base import BaseHeuristic
-from env import encode_choice_to_action_logits
 
 
 class FloorBuilding(BaseHeuristic):
     """
-    Floor Building heuristic (layer-by-layer packing).
+    Floor-building heuristic (layer-by-layer packing), now with:
+      - rotation enabled (rot_id 0..5)
+      - strict boundary/height/support handled ONLY by FeasibilityChecker
+      - box choice locked to buffer slot 0 (for now)
 
-    Strategy:
-        - Prefer lower z (fill floor first)
-        - Tie-break by smaller x + y (corner preference)
-
-    Feasibility:
-        - Fully delegated to FeasibilityChecker (hard constraints)
+    Objective:
+      - minimize z (fill lowest layer first)
+      - tie-break: prefer corner (x+y small)
     """
 
     name = "floor_building"
 
-    def __init__(
-        self,
-        N_visible_boxes,
-        pallet_size_discrete,
-        max_pallet_height,
-        bin_size,
-    ):
-        super().__init__(
-            N_visible_boxes=N_visible_boxes,
-            pallet_size_discrete=pallet_size_discrete,
-            max_pallet_height=max_pallet_height,
-            bin_size=bin_size,
-        )
+    def __init__(self):
+        super().__init__()
 
-    def __call__(self, obs):
+    def __call__(self, obs: dict) -> np.ndarray:
         pallet = obs["pallet_obs_density"]
-        buffer = obs["buffer"]
 
         # --------------------------------------------------
-        # 1. Select box: largest volume first (deterministic)
+        # 0) Pick box slot (locked to first slot)
         # --------------------------------------------------
-        best_box = None
-        best_volume = -1
+        box_slot = 0
+        if self.slot_is_empty(obs, box_slot):
+            # Nothing visible / empty slot: return a deterministic default
+            return self.encode_action_logits(box_slot=0, rot_id=0, x=0, y=0)
 
-        for i in range(self.N):
-            size_cm = buffer[i * 4 : i * 4 + 3]
-            if np.any(size_cm <= 0):
+        props = self.get_slot_props(obs, box_slot)
+        size_bins = self.props_to_size_bins(props)  # (dx,dy,dz) in bins (unrotated)
+
+        best_score = None
+        best_choice = None  # (rot_id, x, y)
+
+        # --------------------------------------------------
+        # 1) Search over rotations and xy placements
+        # --------------------------------------------------
+        for rot_id in range(6):
+            dx, dy, dz = self.rotate_size_bins(size_bins, rot_id)
+
+            # quick prune: if box itself taller than pallet
+            if dz > self.H:
                 continue
 
-            volume = np.prod(size_cm)
-            if volume > best_volume:
-                best_volume = volume
-                best_box = i
+            # scan all x,y (bounds check is done inside feasibility)
+            for x in range(self.X):
+                for y in range(self.Y):
 
-        # No valid box (should not happen normally)
-        if best_box is None:
-            best_box = 0
+                    # ---- IMPORTANT: avoid invalid slicing before computing z ----
+                    # We are NOT doing bounds logic here; we call feasibility's is_within_pallet.
+                    if not self.feasibility.is_within_pallet(x, y, dx, dy):
+                        continue
 
-        box_i = best_box
-        rot_i = 0  # orientation fixed (consistent with env)
+                    # ---- compute z from occupancy (same idea as env) ----
+                    # now slicing is safe because within_pallet passed
+                    place_area = pallet[x:x + dx, y:y + dy, :]
+                    non_zero_mask = np.any(place_area > 0, axis=(0, 1))
+                    z = int(np.max(np.nonzero(non_zero_mask)) + 1) if np.any(non_zero_mask) else 0
 
-        # Box size in bins
-        size_cm = buffer[box_i * 4 : box_i * 4 + 3]
-        dx, dy, dz = self.box_size_to_bins(size_cm)
+                    # ---- final feasibility: boundary + height + support ----
+                    if not self.feasibility.is_feasible(
+                        pallet_obs=pallet,
+                        x=x, y=y,
+                        dx=dx, dy=dy, dz=dz,
+                        z=z,
+                    ):
+                        continue
 
-        # --------------------------------------------------
-        # 2. Search feasible placements (floor building)
-        # --------------------------------------------------
-        best_score = None
-        best_xy = None
-
-        for x in range(self.X):
-            for y in range(self.Y):
-
-                # compute required z from pallet occupancy
-                x2 = x + dx
-                y2 = y + dy
-
-                place_area = pallet[x:x2, y:y2, :]
-                if place_area.size == 0:
-                    continue
-
-                non_zero = np.any(place_area > 0, axis=(0, 1))
-                z = int(np.max(np.nonzero(non_zero)) + 1) if np.any(non_zero) else 0
-
-                # ---------- HARD CONSTRAINT CHECK ----------
-                if not self.feasibility.is_feasible(
-                    pallet_obs=pallet,
-                    x=x, y=y,
-                    dx=dx, dy=dy, dz=dz,
-                    z=z,
-                ):
-                    continue
-
-                # ---------- STRATEGY SCORE ----------
-                # floor building: lowest z, then closest to corner
-                score = (z, x + y)
-
-                if best_score is None or score < best_score:
-                    best_score = score
-                    best_xy = (x, y)
+                    # ---- scoring: lowest z, then corner preference ----
+                    score = (z, x + y)
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_choice = (rot_id, x, y)
 
         # --------------------------------------------------
-        # 3. No feasible placement → let env terminate
+        # 2) No feasible placement found
         # --------------------------------------------------
-        if best_xy is None:
-            # fallback: env will detect failure (term=2)
-            return encode_choice_to_action_logits(
-                N=self.N,
-                X=self.X,
-                Y=self.Y,
-                box_i=box_i,
-                rot_i=rot_i,
-                x_i=0,
-                y_i=0,
-            )
+        if best_choice is None:
+            # deterministic fallback (may fail in env)
+            return self.encode_action_logits(box_slot=box_slot, rot_id=0, x=0, y=0)
 
-        x_i, y_i = best_xy
+        rot_id, x, y = best_choice
 
         # --------------------------------------------------
-        # 4. Encode final action
+        # 3) Encode action logits
         # --------------------------------------------------
-        action = encode_choice_to_action_logits(
-            N=self.N,
-            X=self.X,
-            Y=self.Y,
-            box_i=box_i,
-            rot_i=rot_i,
-            x_i=x_i,
-            y_i=y_i,
+        return self.encode_action_logits(
+            box_slot=box_slot,
+            rot_id=rot_id,
+            x=x,
+            y=y,
         )
-
-        return action
