@@ -4,6 +4,7 @@ import argparse
 from env import BoxPlanningEnvWrapper
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
+from heuristics.llm_entry import LLMBasedHeuristic
 
 
 # ------------------------------------------------------------
@@ -12,6 +13,7 @@ from heuristics.floor_building import FloorBuilding
 HEURISTIC_REGISTRY = {
     "largest_volume_lowest_z": LargestVolumeLowestZ,
     "floor_building": FloorBuilding,
+    "llm_based": LLMBasedHeuristic,
 }
 
 
@@ -76,5 +78,17 @@ if __name__ == "__main__":
     heuristic_cls = HEURISTIC_REGISTRY[args.heuristic]
     heuristic = heuristic_cls()
 
-    print(f"[Run] Heuristic = {heuristic.name}")
-    run_episode(heuristic, max_steps=args.max_steps, seed=args.seed)
+    while True:
+        print(f"[Run] Heuristic = {heuristic.name}")
+        run_episode(heuristic, max_steps=args.max_steps, seed=args.seed)
+
+        if not hasattr(heuristic, "regenerate"):
+            break
+
+        feedback = input("输入反馈（直接回车退出）：").strip()
+        if not feedback:
+            break
+
+        heuristic.regenerate(feedback)
+
+    
