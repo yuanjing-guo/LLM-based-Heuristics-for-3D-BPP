@@ -5,6 +5,8 @@ from env import BoxPlanningEnvWrapper
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
 from heuristics.llm_entry import LLMBasedHeuristic
+from heuristics.empty_maximal_spaces import EMSOnline
+from heuristics.extreme_point import ExtremePointPhysicsAware
 
 
 # ------------------------------------------------------------
@@ -14,6 +16,8 @@ HEURISTIC_REGISTRY = {
     "largest_volume_lowest_z": LargestVolumeLowestZ,
     "floor_building": FloorBuilding,
     "llm_based": LLMBasedHeuristic,
+    "empty_maximal_space": EMSOnline,
+    "extreme_point": ExtremePointPhysicsAware
 }
 
 
