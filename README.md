@@ -33,6 +33,7 @@ A rollout video is saved automatically
 Create a folder named 'report' first, then run evaluate.py, this script will automaticlly generate a .txt evaluation report, named like 'eval__timestamp.txt'
 
 Usage:  
+Register a heuristic first, then do:  
 Run all heuristics for 10 rounds (max_steps=200 per round):
 ```
 python3 evaluate.py --heuristics all --rounds 10 --max_steps 200

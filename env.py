@@ -162,7 +162,7 @@ class BoxPlanning(SingleArmEnv):
         self.n_box_types = int(TaskConfig.box.n_type)
 
         # --- Stability threshold ---
-        self.stable_thres = 0.02
+        self.stable_thres = 0.04
 
         # --- Init box pose source (optional) ---
         self.init_box_pose_path = init_box_pose_path
