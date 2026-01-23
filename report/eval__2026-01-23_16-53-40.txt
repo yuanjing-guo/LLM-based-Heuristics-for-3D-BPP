@@ -1,0 +1,102 @@
+=== Batch Evaluation Report ===
+Time: 2026-01-23_16-53-40
+Heuristics: floor_building, extreme_point_physics
+Rounds: 20
+Max steps per episode: 200
+Save video: False
+
+--- Round 1/20 | seed=2056118145 ---
+floor_building            util=0.533760  n_boxes= 28  term=2
+extreme_point_physics     util=0.768000  n_boxes= 40  term=2
+
+--- Round 2/20 | seed=79043985 ---
+floor_building            util=0.700800  n_boxes= 39  term=2
+extreme_point_physics     util=0.328320  n_boxes= 20  term=2
+
+--- Round 3/20 | seed=2128418291 ---
+floor_building            util=0.491520  n_boxes= 27  term=2
+extreme_point_physics     util=0.424320  n_boxes= 25  term=2
+
+--- Round 4/20 | seed=1066714312 ---
+floor_building            util=0.593920  n_boxes= 30  term=2
+extreme_point_physics     util=0.228480  n_boxes= 12  term=2
+
+--- Round 5/20 | seed=362372127 ---
+floor_building            util=0.716800  n_boxes= 39  term=2
+extreme_point_physics     util=0.526720  n_boxes= 30  term=2
+
+--- Round 6/20 | seed=835048930 ---
+floor_building            util=0.650880  n_boxes= 34  term=2
+extreme_point_physics     util=0.643200  n_boxes= 34  term=2
+
+--- Round 7/20 | seed=751503642 ---
+floor_building            util=0.639360  n_boxes= 32  term=2
+extreme_point_physics     util=0.236160  n_boxes= 13  term=2
+
+--- Round 8/20 | seed=1307621711 ---
+floor_building            util=0.712320  n_boxes= 39  term=2
+extreme_point_physics     util=0.274560  n_boxes= 15  term=2
+
+--- Round 9/20 | seed=1963812466 ---
+floor_building            util=0.549760  n_boxes= 32  term=2
+extreme_point_physics     util=0.420480  n_boxes= 26  term=2
+
+--- Round 10/20 | seed=1028001065 ---
+floor_building            util=0.197760  n_boxes= 11  term=2
+extreme_point_physics     util=0.620160  n_boxes= 33  term=2
+
+--- Round 11/20 | seed=1557637106 ---
+floor_building            util=0.743680  n_boxes= 40  term=2
+extreme_point_physics     util=0.668160  n_boxes= 37  term=2
+
+--- Round 12/20 | seed=1951850269 ---
+floor_building            util=0.650880  n_boxes= 34  term=2
+extreme_point_physics     util=0.572160  n_boxes= 30  term=2
+
+--- Round 13/20 | seed=1306511010 ---
+floor_building            util=0.677760  n_boxes= 39  term=2
+extreme_point_physics     util=0.480000  n_boxes= 26  term=2
+
+--- Round 14/20 | seed=1225852271 ---
+floor_building            util=0.627840  n_boxes= 35  term=2
+extreme_point_physics     util=0.712320  n_boxes= 39  term=2
+
+--- Round 15/20 | seed=800131470 ---
+floor_building            util=0.696960  n_boxes= 38  term=2
+extreme_point_physics     util=0.412800  n_boxes= 25  term=2
+
+--- Round 16/20 | seed=10813538 ---
+floor_building            util=0.648960  n_boxes= 35  term=2
+extreme_point_physics     util=0.424320  n_boxes= 24  term=2
+
+--- Round 17/20 | seed=99892777 ---
+floor_building            util=0.632320  n_boxes= 35  term=2
+extreme_point_physics     util=0.693120  n_boxes= 38  term=2
+
+--- Round 18/20 | seed=386160663 ---
+floor_building            util=0.675840  n_boxes= 38  term=2
+extreme_point_physics     util=0.499840  n_boxes= 28  term=2
+
+--- Round 19/20 | seed=955093527 ---
+floor_building            util=0.023040  n_boxes=  1  term=2
+extreme_point_physics     util=0.357120  n_boxes= 19  term=2
+
+--- Round 20/20 | seed=1945602374 ---
+floor_building            util=0.648960  n_boxes= 34  term=2
+extreme_point_physics     util=0.470400  n_boxes= 26  term=2
+
+
+=== Summary (mean / variance over rounds) ===
+
+[floor_building]
+  util:    mean=0.590656  var=0.030163
+  n_boxes: mean=32.000000  var=90.900000
+  term_reason_counts: {2: 20}
+
+[extreme_point_physics]
+  util:    mean=0.488032  var=0.024559
+  n_boxes: mean=27.000000  var=66.800000
+  term_reason_counts: {2: 20}
+
+=== Seeds (one per round) ===
+2056118145, 79043985, 2128418291, 1066714312, 362372127, 835048930, 751503642, 1307621711, 1963812466, 1028001065, 1557637106, 1951850269, 1306511010, 1225852271, 800131470, 10813538, 99892777, 386160663, 955093527, 1945602374

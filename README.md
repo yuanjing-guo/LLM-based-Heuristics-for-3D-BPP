@@ -16,6 +16,7 @@ python run.py --heuristic floor_building
 If the simulation starts and a video is generated under video/, the environment setup is correct.
 
 ## 2. Quick Start
+### 2.1 Single Episode
 Run a single episode with a selected heuristic:
 
 ```
@@ -28,6 +29,23 @@ The environment executes the action exactly
 Physics simulation determines stability  
 Step-wise logs are printed to the terminal  
 A rollout video is saved automatically
+### 2.2Evaluation Mode
+Create a folder named 'report' first, then run evaluate.py, this script will automaticlly generate a .txt evaluation report, named like 'eval__timestamp.txt'
+
+Usage:  
+Run all heuristics for 10 rounds (max_steps=200 per round):
+```
+python3 evaluate.py --heuristics all --rounds 10 --max_steps 200
+```
+Run only two heuristics:
+```
+python3 evaluate.py --heuristics floor_building,extreme_point --rounds 20 --max_steps 200
+```  
+Save videos for each round (this will be much slower and produce large files):
+```
+python3 evaluate.py --heuristics all --rounds 5 --save_video
+```
+
 
 ## 3. Project Structure
 ```
