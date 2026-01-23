@@ -7,7 +7,8 @@ from heuristics.floor_building import FloorBuilding
 from heuristics.llm_entry import LLMBasedHeuristic
 from heuristics.empty_maximal_spaces import EMSOnline
 from heuristics.extreme_point import ExtremePointPhysicsAware
-
+from heuristics.floor_building_buffer import FloorBuildingBuffer
+from heuristics.floor_building_buffer_rule_physics import FloorBuildingBufferRulePhysics
 
 # ------------------------------------------------------------
 # Heuristic registry
@@ -17,15 +18,36 @@ HEURISTIC_REGISTRY = {
     "floor_building": FloorBuilding,
     "llm_based": LLMBasedHeuristic,
     "empty_maximal_space": EMSOnline,
-    "extreme_point": ExtremePointPhysicsAware
+    "extreme_point": ExtremePointPhysicsAware,
+    "floor_building_buffer":FloorBuildingBuffer,
+    "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics
 }
 
 
 # ------------------------------------------------------------
 # Run one episode
 # ------------------------------------------------------------
-def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
-    env = BoxPlanningEnvWrapper(save_video_path=f"video/{heuristic.name}.mp4")
+def run_episode(
+    heuristic,
+    max_steps: int = 200,
+    seed: int = 0,
+    save_video: bool = True,         # DEFAULT: save video
+    soft: bool = False,      # DEFAULT: rigid; only True => soft
+    expose_physics_obs: bool = True, # False -> physics obs fields filled with zeros
+) -> float:
+    physics_mode = "soft" if soft else "rigid"
+
+    video_path = (
+        f"video/{heuristic.name}__{physics_mode}.mp4"
+        if save_video
+        else None
+    )
+
+    env = BoxPlanningEnvWrapper(
+        save_video_path=video_path,
+        physics_mode=("soft" if soft else None),  # None => rigid default (per env policy)
+        expose_physics_obs=expose_physics_obs,
+    )
 
     obs, _ = env.reset(seed=seed)
     if hasattr(heuristic, "reset"):
@@ -40,20 +62,8 @@ def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
         obs, reward, done, trunc, info = env.step(action)
 
         step += 1
-
-        util = float(info.get("util_current", 0.0))
-        last_util = util
-
-        print(f"step={step:02d}")
-        #     f"V_boxes={info.get('V_boxes_bins3', 0):.0f}, "
-        #     f"V_env_hm={info.get('V_env_hm_bins3', 0):.0f}, "
-        #     f"hmax={info.get('hmax_bins', 0):.0f}, "
-        #     f"footprint={info.get('footprint_bins2', 0):.0f}, "
-        #     f"placed={len(env.env.boxes_on_pallet_id)}, "
-        #     f"term={info.get('termination_reason', -1)}"
-        # )
-
-    # print(f"[{heuristic.name}] Finished. final_util={last_util:.4f}")
+        # terminal util is stored in info["util"] when done
+        last_util = float(info.get("util", info.get("util_current", 0.0)))
 
     # Graceful cleanup (reduces EGL warnings)
     if hasattr(env.env, "writer") and env.env.writer is not None:
@@ -68,24 +78,66 @@ def run_episode(heuristic, max_steps: int = 200, seed: int = 0) -> float:
 # ------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "--heuristic",
         type=str,
         required=True,
-        choices=HEURISTIC_REGISTRY.keys(),
+        choices=list(HEURISTIC_REGISTRY.keys()),
         help="Which heuristic to run",
     )
     parser.add_argument("--max_steps", type=int, default=200)
     parser.add_argument("--seed", type=int, default=0)
+
+    # -------- Runtime env switches --------
+    # NEW: only a boolean switch; default is rigid
+    parser.add_argument(
+        "--soft",
+        action="store_true",
+        help="Enable soft-contact physics. If not set, rigid physics is used by default.",
+    )
+    parser.add_argument(
+        "--no_physics_obs",
+        action="store_true",
+        help="Disable physics-aware observations (fields exist but filled with zeros).",
+    )
+    parser.add_argument(
+        "--no_video",
+        action="store_true",
+        help="Disable video saving (default: video is saved).",
+    )
+
     args = parser.parse_args()
 
     heuristic_cls = HEURISTIC_REGISTRY[args.heuristic]
     heuristic = heuristic_cls()
 
+    # --------------------------------------------------------
+    # Interactive loop (only relevant for LLM-based heuristic)
+    # --------------------------------------------------------
     while True:
-        print(f"[Run] Heuristic = {heuristic.name}")
-        run_episode(heuristic, max_steps=args.max_steps, seed=args.seed)
+        mode_str = "soft" if args.soft else "rigid"
+        print(
+            "[Run] Heuristic={} | seed={} | max_steps={} | physics_mode={} | physics_obs={} | video={}".format(
+                heuristic.name,
+                args.seed,
+                args.max_steps,
+                mode_str,
+                "off" if args.no_physics_obs else "on",
+                "off" if args.no_video else "on",
+            )
+        )
 
+        run_episode(
+            heuristic,
+            max_steps=args.max_steps,
+            seed=args.seed,
+            save_video=(not args.no_video),
+            soft=args.soft,
+            expose_physics_obs=(not args.no_physics_obs),
+        )
+
+        # Only LLM-based heuristic is expected to have regenerate()
         if not hasattr(heuristic, "regenerate"):
             break
 
@@ -94,5 +146,3 @@ if __name__ == "__main__":
             break
 
         heuristic.regenerate(feedback)
-
-    

@@ -40,13 +40,17 @@ python3 evaluate.py --heuristics all --rounds 10 --max_steps 200
 ```
 Run only two heuristics:
 ```
-python3 evaluate.py --heuristics floor_building,extreme_point --rounds 20 --max_steps 200
 ```  
 Save videos for each round (this will be much slower and produce large files):
 ```
 python3 evaluate.py --heuristics all --rounds 5 --save_video
 ```
-
+### 2.3 buffer and physics-awareness
+now the simulation env supports buffer and physics functions. Demo heuristics are 'floor_building_buffer_rule_physics' and 'floor_building_buffer'  
+you can explicitly specify the mode by:
+```
+python3 run.py --heuristic floor_building_buffer_rule_physics --soft
+```
 
 ## 3. Project Structure
 ```

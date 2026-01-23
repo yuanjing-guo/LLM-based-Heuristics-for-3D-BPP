@@ -14,7 +14,7 @@ class FeasibilityChecker:
       - Placement occupies [x:x+dx, y:y+dy, z:z+dz)
     """
 
-    def __init__(self, X: int, Y: int, H: int, min_support_ratio: float = 0.7):
+    def __init__(self, X: int, Y: int, H: int, min_support_ratio: float = 0.8):
         self.X = int(X)
         self.Y = int(Y)
         self.H = int(H)

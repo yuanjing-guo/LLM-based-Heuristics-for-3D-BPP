@@ -2,17 +2,28 @@
 # Pure-execution palletization environment (robosuite + gymnasium wrapper).
 # - Heuristic outputs FINAL action logits (no mask inside env).
 # - Env decodes logits -> choose box / rot / x / y -> computes z -> teleports box -> sim -> stability check -> state update.
-# - STRICT: if any part of box would exceed pallet boundary -> raise RuntimeError.
+# - STRICT: if any part of box would exceed pallet boundary -> raise RuntimeError (XY only).
+# - HEIGHT policy (UPDATED): if box would exceed max height -> TERMINATE episode gracefully (no crash), return util in info.
 #
 # Reward (UPDATED):
 #   - Use FINAL VOLUME utilization as terminal reward:
 #       util = V_boxes / V_bin
 #     where V_boxes is occupied voxel count, V_bin = X*Y*H (discrete bin volume).
-#   - Per-step reward = 0, only terminal reward = util (success or unstable termination).
+#   - Per-step reward = 0, only terminal reward = util (success / unstable / height_oob termination).
 #
 # Logging (UPDATED):
-#   - Each step prints ONLY: placement discrete (x,y,z) and rot_id
+#   - Each step prints ONLY: placement discrete (x,y,z) and rot_id + chosen buffer slot
 #   - Episode end prints ONCE: util and number of committed (stable) boxes
+#
+# Physics-aware obs (NEW, backward compatible):
+#   - Keep obs["buffer"] unchanged: size(3) + density(1)  (TaskConfig.box.n_properties=4)
+#   - Add obs["buffer_physics"]: per-slot [softness, friction_mu]
+#   - Add obs["pallet_obs_softness"]: voxel field aligned with pallet_obs_density
+#
+# IMPORTANT POLICY (UPDATED):
+#   - TaskConfig no longer decides physics mode.
+#   - ONLY when physics_mode == "soft" we enable soft contact.
+#   - Otherwise (None / "rigid") => rigid mode by default.
 
 import copy
 import os
@@ -65,11 +76,23 @@ ORDERS = {
 }
 
 
+class HeightLimitExceeded(RuntimeError):
+    """
+    Graceful (non-crashing) terminal condition:
+    placement would exceed max height.
+    Carries discrete placement info for logging/debug.
+    """
+    def __init__(self, msg: str, *, x: int, y: int, z: int, dz: int, H: int):
+        super().__init__(msg)
+        self.x = int(x)
+        self.y = int(y)
+        self.z = int(z)
+        self.dz = int(dz)
+        self.H = int(H)
+
+
 def quat_xyzw_from_order(order_id: int) -> np.ndarray:
-    """
-    Return target quaternion (xyzw) for the 6 discrete orientations.
-    Matches your original compute_target_quat_from_order.
-    """
+    """Return target quaternion (xyzw) for the 6 discrete orientations."""
     if order_id == 0:
         rotm = np.eye(3)
     elif order_id == 1:
@@ -90,26 +113,15 @@ def quat_xyzw_from_order(order_id: int) -> np.ndarray:
 
 
 def compute_utilization_volume(pallet_obs_density: np.ndarray) -> Dict[str, float]:
-    """
-    Volume utilization (strict bin volume utilization).
-
-    pallet_obs_density shape: (X, Y, H)
-      >0 means occupied
-      =0 means empty
-
-    Define:
-      V_boxes = sum(occ)
-      V_bin   = X * Y * H
-      util    = V_boxes / V_bin
-    """
+    """Volume utilization util = occupied_voxels / (X*Y*H)."""
     if pallet_obs_density.ndim != 3:
         raise ValueError(f"pallet_obs_density must be (X,Y,H), got {pallet_obs_density.shape}")
 
     X, Y, H = pallet_obs_density.shape
     occ = pallet_obs_density > 0
 
-    V_boxes = float(occ.sum())              # bins^3
-    V_bin = float(X * Y * H)                # bins^3
+    V_boxes = float(occ.sum())
+    V_bin = float(X * Y * H)
     util = float(V_boxes / max(V_bin, 1.0))
 
     return {
@@ -132,6 +144,10 @@ class BoxPlanning(SingleArmEnv):
     - action logits -> discrete (box_index, rot_id, x, y)
     - env computes z from pallet occupancy
     - teleports the box, runs physics, checks stability, updates state
+
+    Physics-aware obs:
+      - obs["pallet_obs_softness"] : voxel field (X,Y,H)
+      - obs["buffer_physics"]      : per-slot [softness, friction_mu]
     """
 
     def __init__(
@@ -141,7 +157,27 @@ class BoxPlanning(SingleArmEnv):
         control_freq: int = 20,
         horizon: int = 100,
         ignore_done: bool = True,
+        physics_mode: Optional[str] = None,   # "soft" enables soft contacts; otherwise rigid default
+        expose_physics_obs: bool = True,
     ):
+        # ------------------------------------------------------------
+        # Physics mode policy (UPDATED):
+        #   - ONLY physics_mode == "soft" => soft contact
+        #   - otherwise => rigid
+        # ------------------------------------------------------------
+        if physics_mode is None:
+            self.physics_mode = "rigid"
+        else:
+            pm = str(physics_mode).lower().strip()
+            if pm == "soft":
+                self.physics_mode = "soft"
+            elif pm == "rigid":
+                self.physics_mode = "rigid"
+            else:
+                raise ValueError(f"Invalid physics_mode={physics_mode}. Use 'soft' or 'rigid' (or omit for rigid).")
+
+        self.expose_physics_obs = bool(expose_physics_obs)
+
         # --- Table config ---
         self.table_full_size = TaskConfig.table.full_size
         self.table_friction = TaskConfig.table.friction
@@ -158,11 +194,19 @@ class BoxPlanning(SingleArmEnv):
         self.max_pallet_height = int(TaskConfig.pallet.max_pallet_height)
         self.bin_size = float(TaskConfig.bin_size)
         self.pallet_size_discrete = (self.pallet_size[:2] / self.bin_size).astype(int)  # (X, Y)
-        self.n_properties = int(TaskConfig.box.n_properties)  # e.g., 4: (sx, sy, sz, density)
+        self.n_properties = int(TaskConfig.box.n_properties)  # keep as-is (e.g., 4)
         self.n_box_types = int(TaskConfig.box.n_type)
 
+        # --- NEW: buffer_physics dims ---
+        self.n_physics_properties = 2  # [softness, friction_mu]
+
         # --- Stability threshold ---
-        self.stable_thres = 0.04
+        self.stable_thres = 0.01
+
+        # --- Early stop controls (NEW) ---
+        # If a placement becomes unstable during sim, stop sim immediately and terminate episode.
+        self.early_stop_on_unstable = True
+        self.early_stop_check_every = 1  # check stability every N sim steps
 
         # --- Init box pose source (optional) ---
         self.init_box_pose_path = init_box_pose_path
@@ -195,28 +239,31 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def create_box(self, box_type: int, box_name: str) -> BoxObject:
-        """Create a box object with either rigid or soft physics parameters."""
-        physics_cfg = getattr(TaskConfig, "physics", None)
-        physics_mode = physics_cfg.mode if physics_cfg is not None else "soft"
+        """
+        Create a box object with either rigid or soft contact parameters.
 
-        if physics_mode == "rigid":
-            density = 10.0
-            solref = [0.001, 1.0]
-            solimp = [0.99, 0.99, 0.001]
-            friction = (1.0, 0.005, 0.0001)
-        elif physics_mode == "soft":
-            cfg = TaskConfig.box.type_dict[box_type]
-            density = cfg["density"]
-            solref = [0.02, cfg["softness"]]
+        Design choice:
+          - density/friction always from TaskConfig (so "weight" differences remain meaningful)
+          - physics_mode mainly changes contact softness (solref/solimp)
+        """
+        cfg = TaskConfig.box.type_dict[box_type]
+        density = cfg["density"]
+        friction = cfg["friction"]
+        softness = float(cfg.get("softness", 1.0))
+
+        if self.physics_mode == "rigid":
+            solref = [0.0001, 1.0]
+            solimp = [0.999, 0.999, 0.00001]
+        elif self.physics_mode == "soft":
+            solref = [0.03, softness]
             solimp = [0.9, 0.95, 0.001]
-            friction = cfg["friction"]
         else:
-            raise ValueError(f"Unknown physics mode: {physics_mode}")
+            raise ValueError(f"Unknown physics_mode: {self.physics_mode}")
 
         return BoxObject(
             name=box_name,
-            size=TaskConfig.box.type_dict[box_type]["size"],
-            material=TaskConfig.box.type_dict[box_type]["material"],
+            size=cfg["size"],
+            material=cfg["material"],
             friction=friction,
             density=density,
             solref=solref,
@@ -226,11 +273,9 @@ class BoxPlanning(SingleArmEnv):
     def _load_model(self):
         super()._load_model()
 
-        # Adjust robot base pose to table
         xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
         self.robots[0].robot_model.set_base_xpos(xpos)
 
-        # Table arena
         mujoco_arena = TableArena(
             table_full_size=self.table_full_size,
             table_friction=self.table_friction,
@@ -238,13 +283,11 @@ class BoxPlanning(SingleArmEnv):
         )
         mujoco_arena.set_origin([0, 0, 0])
 
-        # Boxes
         if self.init_box_pose_path is None:
             self._load_boxes_from_recorded_pose()
         else:
             self._load_boxes_random_pose()
 
-        # Pallet
         self.pallet = BoxObject(
             name="pallet",
             size=self.pallet_size / 2,
@@ -252,7 +295,6 @@ class BoxPlanning(SingleArmEnv):
         )
         self.pallet.get_obj().set("pos", array_to_string(self.pallet_position))
 
-        # Assemble task
         self.model = ManipulationTask(
             mujoco_arena=mujoco_arena,
             mujoco_robots=[robot.robot_model for robot in self.robots],
@@ -260,7 +302,6 @@ class BoxPlanning(SingleArmEnv):
         )
 
     def _load_boxes_from_recorded_pose(self):
-        """Load boxes and set their initial pose from a saved .npy file."""
         self.box_init_pose = np.load(self.init_box_pose_path).tolist()
         self.total_box_number = 0
         self.box_obj_list = [[] for _ in range(self.n_box_types)]
@@ -279,7 +320,6 @@ class BoxPlanning(SingleArmEnv):
                 self.total_box_number += 1
 
     def _load_boxes_random_pose(self):
-        """Load boxes and set random initial positions (roughly above the table)."""
         self.total_box_number = 0
         self.box_obj_list = [[] for _ in range(self.n_box_types)]
 
@@ -309,9 +349,21 @@ class BoxPlanning(SingleArmEnv):
 
         self.boxes_ids = []
         self.id_to_box_obj: Dict[int, BoxObject] = {}
+
+        # original: size(3) + density(1) [scaled]
         self.id_to_properties: Dict[int, np.ndarray] = {}
 
+        # physics properties for obs
+        self.id_to_softness: Dict[int, float] = {}
+        self.id_to_friction_mu: Dict[int, float] = {}
+
         for i in range(self.n_box_types):
+            box_type = i + 1
+            cfg = TaskConfig.box.type_dict[box_type]
+
+            softness_val = float(cfg.get("softness", 1.0))
+            mu_val = float(cfg.get("friction", (1.0, 0.005, 0.0001))[0])
+
             for j in range(len(self.box_obj_list[i])):
                 box_obj = self.box_obj_list[i][j]
                 box_id = self.sim.model.body_name2id(box_obj.root_body)
@@ -323,16 +375,17 @@ class BoxPlanning(SingleArmEnv):
                 props = list(np.array(box_obj.size, dtype=np.float32) * 100.0) + [float(box_obj.density) / 1000.0]
                 self.id_to_properties[box_id] = np.array(props, dtype=np.float32)
 
+                self.id_to_softness[box_id] = softness_val
+                self.id_to_friction_mu[box_id] = mu_val
+
     # ---------------------------
     # Action decoding
     # ---------------------------
 
     def choose_box_slot(self, action: np.ndarray) -> int:
-        """Pick which buffer index to use from logits (argmax)."""
         return int(np.argmax(action[: self.N_visible_boxes]))
 
     def choose_rot_id(self, action: np.ndarray) -> int:
-        """Pick one of 6 rotation IDs from logits (argmax)."""
         rot_logits = action[self.N_visible_boxes : self.N_visible_boxes + 6]
         return int(np.argmax(rot_logits))
 
@@ -341,12 +394,9 @@ class BoxPlanning(SingleArmEnv):
         action: np.ndarray,
         box_size_after_rotate: np.ndarray,
     ) -> Tuple[np.ndarray, Tuple[int, int, int]]:
-        """
-        STRICT: If any part of the box goes out of bounds -> raise RuntimeError.
-        Decodes x,y from action logits and computes z from occupancy.
-        """
         X = int(self.pallet_size_discrete[0])
         Y = int(self.pallet_size_discrete[1])
+        H = int(self.max_pallet_height)
 
         x_logits = action[self.N_visible_boxes + 6 : self.N_visible_boxes + 6 + X]
         y_logits = action[self.N_visible_boxes + 6 + X : self.N_visible_boxes + 6 + X + Y]
@@ -358,9 +408,9 @@ class BoxPlanning(SingleArmEnv):
 
         dx = int(box_size_after_rotate[0])
         dy = int(box_size_after_rotate[1])
+        dz = int(box_size_after_rotate[2])
 
-        # Correct strict bound:
-        #   x+dx <= X, y+dy <= Y
+        # XY strict boundary -> still a hard RuntimeError
         if (x + dx > X) or (y + dy > Y):
             raise RuntimeError(
                 f"[OutOfBounds] Box would exceed pallet boundary: "
@@ -375,13 +425,21 @@ class BoxPlanning(SingleArmEnv):
         non_zero_mask = np.any(place_area > 0, axis=(0, 1))
         z = int(np.max(np.nonzero(non_zero_mask)) + 1) if np.any(non_zero_mask) else 0
 
+        # Z strict height -> graceful terminal (NO CRASH)
+        if (z + dz > H):
+            raise HeightLimitExceeded(
+                f"[OutOfBoundsZ] Box would exceed max height: "
+                f"(x,y)=({x},{y}), (z,dz)=({z},{dz}), H={H}. Need z+dz<=H.",
+                x=x, y=y, z=z, dz=dz, H=H
+            )
+
         target_x = self.pallet_position[0] - self.pallet_size[0] / 2 + x * self.bin_size + dx * self.bin_size / 2
         target_y = self.pallet_position[1] - self.pallet_size[1] / 2 + y * self.bin_size + dy * self.bin_size / 2
         target_z = (
             self.pallet_position[2]
             + self.pallet_size[2] / 2
             + z * self.bin_size
-            + int(box_size_after_rotate[2]) * self.bin_size / 2
+            + dz * self.bin_size / 2
         )
 
         target_pos = np.array([target_x, target_y, target_z], dtype=np.float32)
@@ -392,7 +450,6 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def place_box(self, box_obj: BoxObject, target_pos: np.ndarray, target_quat_xyzw: np.ndarray):
-        """Teleport box to target pose. quat is xyzw."""
         self.sim.data.set_joint_qpos(
             box_obj.joints[0],
             np.concatenate([target_pos, T.convert_quat(target_quat_xyzw, to="wxyz")]),
@@ -404,14 +461,43 @@ class BoxPlanning(SingleArmEnv):
             self.sim.forward()
             self.sim.step()
 
+    def sim_forward_until_unstable(
+        self,
+        steps: int,
+        placed_box_id: int,
+        placed_target_pos: np.ndarray,
+        check_every: int = 1,
+    ) -> bool:
+        """
+        Run physics for at most `steps`. If any already-committed box (or the newly placed box)
+        deviates beyond stable_thres, stop immediately and return False.
+        Return True if stayed stable for all steps.
+        """
+        check_every = max(1, int(check_every))
+        for k in range(steps):
+            self.sim.forward()
+            self.sim.step()
+
+            if (k + 1) % check_every != 0:
+                continue
+
+            # committed boxes must remain near their target pose
+            if not self.check_stable():
+                return False
+
+            # newly placed box must remain near its intended target position
+            cur_pos = self.get_box_pose(placed_box_id)[:3]
+            if np.linalg.norm(cur_pos - placed_target_pos) > self.stable_thres:
+                return False
+
+        return True
+
     def get_box_pose(self, box_id: int) -> np.ndarray:
-        """Return [x,y,z,qx,qy,qz,qw] (quat in xyzw)."""
         box_pos = np.array(self.sim.data.body_xpos[box_id], dtype=np.float32)
         box_quat = convert_quat(np.array(self.sim.data.body_xquat[box_id], dtype=np.float32), to="xyzw")
         return np.hstack((box_pos, box_quat))
 
     def check_stable(self) -> bool:
-        """Old boxes should stay near their target position."""
         for box_id in self.boxes_on_pallet_id:
             cur = self.get_box_pose(box_id)[:3]
             tgt = self.boxes_on_pallet_target_pose[box_id][:3]
@@ -419,18 +505,32 @@ class BoxPlanning(SingleArmEnv):
                 return False
         return True
 
-    def update_obs_buffer(self) -> np.ndarray:
-        """Fill obs['buffer'] with properties of first N unplaced boxes (zero-padded)."""
+    def update_obs_buffer(self) -> None:
+        """
+        Fill obs['buffer'] with properties of first N unplaced boxes (zero-padded).
+        Also fill obs['buffer_physics'].
+        """
         buf = np.zeros(self.N_visible_boxes * self.n_properties, dtype=np.float32)
+        buf_phy = np.zeros(self.N_visible_boxes * self.n_physics_properties, dtype=np.float32)
+
         n = min(len(self.unplaced_box_ids), self.N_visible_boxes)
         for i in range(n):
-            props = self.id_to_properties[self.unplaced_box_ids[i]]
+            box_id = self.unplaced_box_ids[i]
+
+            props = self.id_to_properties[box_id]
             buf[self.n_properties * i : self.n_properties * (i + 1)] = props
+
+            if self.expose_physics_obs:
+                softness = float(self.id_to_softness.get(box_id, 0.0))
+                mu = float(self.id_to_friction_mu.get(box_id, 0.0))
+                base = self.n_physics_properties * i
+                buf_phy[base + 0] = softness
+                buf_phy[base + 1] = mu
+
         self.obs["buffer"] = buf
-        return buf
+        self.obs["buffer_physics"] = buf_phy
 
     def save_frame(self):
-        """Render one frame and append to video."""
         if not self.save_video:
             return
         self._update_observables()
@@ -438,8 +538,7 @@ class BoxPlanning(SingleArmEnv):
         self.writer.append_data(img)
 
     def record_pallet(self, box_id: int, rot_id: int, target_quat: np.ndarray, size_after_rotate: np.ndarray) -> Dict:
-        """Create a debug record for offline analysis."""
-        return {
+        rec = {
             "pallet_config": copy.deepcopy(self.boxes_on_pallet_target_pose),
             "pallet_obs_density": self.obs["pallet_obs_density"].copy(),
             "to_place_id": int(box_id),
@@ -448,30 +547,27 @@ class BoxPlanning(SingleArmEnv):
             "size_after_rotate": size_after_rotate.copy(),
             "to_place_density": float(self.id_to_properties[box_id][3]),
         }
+        if "pallet_obs_softness" in self.obs:
+            rec["pallet_obs_softness"] = self.obs["pallet_obs_softness"].copy()
+            rec["to_place_softness"] = float(self.id_to_softness.get(box_id, 0.0))
+        return rec
 
     # ---------------------------
-    # Reward (UPDATED)
+    # Reward
     # ---------------------------
 
     def reward_func(self, termination_reason: int) -> Tuple[float, Dict]:
-        """
-        termination_reason:
-            0 -> ongoing
-            2 -> unstable (failed placement)
-            3 -> success (placed all)
-            4 -> invalid action (picked empty buffer slot)
+        info: Dict[str, float] = {
+            "termination_reason": int(termination_reason),
+            "physics_mode": str(self.physics_mode),
+            "expose_physics_obs": int(self.expose_physics_obs),
+        }
 
-        Reward policy (UPDATED):
-          - ongoing: reward = 0
-          - invalid action: reward = 0 (episode continues)
-          - terminal (2 or 3): reward = final VOLUME utilization util = V_boxes / V_bin
-        """
-        info: Dict[str, float] = {"termination_reason": int(termination_reason)}
-
-        if termination_reason in (2, 3):
+        # terminal util on: unstable(2), success(3), height_oob(5)
+        if termination_reason in (2, 3, 5):
             metrics = compute_utilization_volume(self.obs["pallet_obs_density"])
             r = float(metrics["util"])
-            info.update(metrics)  # util, V_boxes_bins3, V_bin_bins3, X,Y,H
+            info.update(metrics)
         else:
             r = 0.0
 
@@ -483,21 +579,20 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def reinit(self, rng: np.random.Generator) -> Dict:
-        """
-        Deterministic reset used by wrapper.reset(seed=...).
-        - If recorded init poses exist, teleport boxes back to their init pose.
-        - Shuffle the order of unplaced boxes (affects buffer ordering).
-        - Clear pallet occupancy.
-        """
         self._reset_boxes_to_init_pose_if_available()
 
         self.unplaced_box_ids = copy.copy(self.boxes_ids)
         rng.shuffle(self.unplaced_box_ids)
 
         X, Y = int(self.pallet_size_discrete[0]), int(self.pallet_size_discrete[1])
+
         self.obs = {
-            "pallet_obs_density": np.zeros((X, Y, self.max_pallet_height), dtype=np.float32)
+            "pallet_obs_density": np.zeros((X, Y, self.max_pallet_height), dtype=np.float32),
+            "pallet_obs_softness": np.zeros((X, Y, self.max_pallet_height), dtype=np.float32),
+            "buffer": np.zeros((self.N_visible_boxes * self.n_properties,), dtype=np.float32),
+            "buffer_physics": np.zeros((self.N_visible_boxes * self.n_physics_properties,), dtype=np.float32),
         }
+
         self.update_obs_buffer()
 
         self.boxes_on_pallet_id = []
@@ -505,7 +600,6 @@ class BoxPlanning(SingleArmEnv):
         return self.obs
 
     def _reset_boxes_to_init_pose_if_available(self):
-        """Teleport boxes to saved init pose if self.box_init_pose exists."""
         if not hasattr(self, "box_init_pose"):
             return
         for i in range(self.total_box_number):
@@ -519,15 +613,9 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def step(self, action: np.ndarray):
-        """
-        Decode action -> place one box -> sim -> stable? -> update state.
-        Returns: obs, reward, done, info   (wrapper converts to gymnasium 5-tuple)
-        """
-        # 1) decode box slot + rotation id
         box_slot = self.choose_box_slot(action)
         rot_id = self.choose_rot_id(action)
 
-        # invalid: slot refers to empty padded buffer entry
         if box_slot >= len(self.unplaced_box_ids):
             reward, info = self.reward_func(termination_reason=4)
             done = False
@@ -535,39 +623,63 @@ class BoxPlanning(SingleArmEnv):
             info["record_data"] = None
             return self.obs, reward, done, info
 
-        # 2) resolve box id & properties
         box_id = self.unplaced_box_ids[box_slot]
         box_obj = self.id_to_box_obj[box_id]
 
-        # discretized size (dx,dy,dz) in "natural axis order"
         box_size = (np.array(box_obj.size, dtype=np.float32) * 2.0 / self.bin_size).astype(int)
-        box_density = float(self.id_to_properties[box_id][3])
+        box_density = float(self.id_to_properties[box_id][3])  # density/1000
+        box_softness = float(self.id_to_softness.get(box_id, 0.0))
 
-        # 3) apply rotation: axis permutation + target quat
         order = ORDERS[int(np.clip(rot_id, 0, 5))]
         target_quat = quat_xyzw_from_order(rot_id)
         size_after_rotate = box_size[order]
-        self._last_order_debug = order
 
-        # 4) record state before placing
         record_data = self.record_pallet(box_id, rot_id, target_quat, size_after_rotate)
 
-        # 5) decode x,y and compute z (strict bounds)
-        target_pos, (x, y, z) = self.get_target_position_strict(action, size_after_rotate)
+        # --------- UPDATED: height_oob -> graceful done (no crash) ---------
+        try:
+            target_pos, (x, y, z) = self.get_target_position_strict(action, size_after_rotate)
+        except HeightLimitExceeded as e:
+            reward, info = self.reward_func(termination_reason=5)  # 5: height_oob
+            done = True
+            self.save_frame()
 
-        # Per-step print: ONLY placement and rotation
-        print(f"[Step] rot_id={int(rot_id)} place=(x={int(x)}, y={int(y)}, z={int(z)})")
+            info["error"] = str(e)
+            info["record_data"] = record_data
+            info["chosen_discrete"] = {
+                "box_buffer_index": int(box_slot),
+                "rot_id": int(rot_id),
+                "x": int(e.x),
+                "y": int(e.y),
+                "z": int(e.z),
+            }
+            info["box_density"] = float(box_density)
+            info["box_softness"] = float(box_softness)
 
-        # 6) place & simulate
+            final_util = float(info.get("util", 0.0))
+            n_boxes = int(len(self.boxes_on_pallet_id))
+            print(f"[EpisodeEnd] reason=height_oob util={final_util:.4f} n_boxes={n_boxes}")
+            return self.obs, reward, done, info
+
+        print(f"[Step] slot={int(box_slot)} rot_id={int(rot_id)} place=(x={int(x)}, y={int(y)}, z={int(z)})")
+
         self.place_box(box_obj, target_pos, target_quat)
-        self.sim_forward(40)
 
-        # 7) stability check
-        cur_pos = self.get_box_pose(box_id)[:3]
-        is_stable = self.check_stable() and (np.linalg.norm(cur_pos - target_pos) < self.stable_thres)
+        # --------- early stop inside physics rollout ---------
+        if self.early_stop_on_unstable:
+            is_stable = self.sim_forward_until_unstable(
+                steps=40,
+                placed_box_id=box_id,
+                placed_target_pos=target_pos,
+                check_every=self.early_stop_check_every,
+            )
+        else:
+            self.sim_forward(40)
+            cur_pos = self.get_box_pose(box_id)[:3]
+            is_stable = self.check_stable() and (np.linalg.norm(cur_pos - target_pos) < self.stable_thres)
 
         if not is_stable:
-            reward, info = self.reward_func(termination_reason=2)  # FINAL util on current committed pallet
+            reward, info = self.reward_func(termination_reason=2)
             done = True
             self.save_frame()
             info["record_data"] = record_data
@@ -579,38 +691,34 @@ class BoxPlanning(SingleArmEnv):
                 "z": int(z),
             }
             info["box_density"] = float(box_density)
+            info["box_softness"] = float(box_softness)
 
-            # Episode end print ONCE
             final_util = float(info.get("util", 0.0))
-            n_boxes = int(len(self.boxes_on_pallet_id))  # committed stable boxes
+            n_boxes = int(len(self.boxes_on_pallet_id))
             print(f"[EpisodeEnd] reason=unstable util={final_util:.4f} n_boxes={n_boxes}")
 
             return self.obs, reward, done, info
 
-        # --- Commit placement ---
+        # Commit placement
         self.unplaced_box_ids.pop(box_slot)
         self.boxes_on_pallet_id.append(box_id)
         self.boxes_on_pallet_target_pose[box_id] = np.concatenate([target_pos, target_quat])
 
-        # Update occupancy (no clipping needed because strict bounds already checked)
         dx, dy, dz = int(size_after_rotate[0]), int(size_after_rotate[1]), int(size_after_rotate[2])
         x2, y2, z2 = x + dx, y + dy, z + dz
-        self.obs["pallet_obs_density"][x:x2, y:y2, z:z2] = float(box_density)
 
-        # Update buffer
+        self.obs["pallet_obs_density"][x:x2, y:y2, z:z2] = float(box_density)
+        if self.expose_physics_obs:
+            self.obs["pallet_obs_softness"][x:x2, y:y2, z:z2] = float(box_softness)
+
         self.update_obs_buffer()
 
-        # Episode termination
         done = (len(self.boxes_on_pallet_id) == self.total_box_number)
         term_reason = 3 if done else 0
 
-        # Reward: only final util at terminal
         reward, info = self.reward_func(term_reason)
-
-        # Video
         self.save_frame()
 
-        # Info
         info["record_data"] = record_data
         info["chosen_discrete"] = {
             "box_buffer_index": int(box_slot),
@@ -620,8 +728,8 @@ class BoxPlanning(SingleArmEnv):
             "z": int(z),
         }
         info["box_density"] = float(box_density)
+        info["box_softness"] = float(box_softness)
 
-        # Episode end print ONCE (success)
         if term_reason == 3:
             final_util = float(info.get("util", 0.0))
             n_boxes = int(len(self.boxes_on_pallet_id))
@@ -639,14 +747,22 @@ class BoxPlanningEnvWrapper(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, save_video_path: Optional[str] = None):
+    def __init__(
+        self,
+        save_video_path: Optional[str] = None,
+        physics_mode: Optional[str] = None,   # None => rigid default; "soft" => soft; "rigid" => rigid
+        expose_physics_obs: bool = True,
+    ):
         super().__init__()
         self.env = BoxPlanning(
             save_video_path=save_video_path,
             init_box_pose_path="./helpers/box_init_pose.npy",
+            physics_mode=physics_mode,
+            expose_physics_obs=expose_physics_obs,
         )
 
         X, Y = int(self.env.pallet_size_discrete[0]), int(self.env.pallet_size_discrete[1])
+        H = int(self.env.max_pallet_height)
         N = int(self.env.N_visible_boxes)
 
         action_dim = int(N + 6 + X + Y)
@@ -656,22 +772,33 @@ class BoxPlanningEnvWrapper(gym.Env):
             dtype=np.float32,
         )
 
-        self.observation_space = spaces.Dict(
-            {
-                "pallet_obs_density": spaces.Box(
-                    low=0.0,
-                    high=10.0,
-                    shape=(X, Y, self.env.max_pallet_height),
-                    dtype=np.float32,
-                ),
-                "buffer": spaces.Box(
-                    low=0.0,
-                    high=10.0,
-                    shape=(N * self.env.n_properties,),
-                    dtype=np.float32,
-                ),
-            }
-        )
+        obs_spaces = {
+            "pallet_obs_density": spaces.Box(
+                low=0.0,
+                high=10.0,
+                shape=(X, Y, H),
+                dtype=np.float32,
+            ),
+            "buffer": spaces.Box(
+                low=0.0,
+                high=10.0,
+                shape=(N * self.env.n_properties,),
+                dtype=np.float32,
+            ),
+            "pallet_obs_softness": spaces.Box(
+                low=0.0,
+                high=10.0,
+                shape=(X, Y, H),
+                dtype=np.float32,
+            ),
+            "buffer_physics": spaces.Box(
+                low=0.0,
+                high=10.0,
+                shape=(N * self.env.n_physics_properties,),
+                dtype=np.float32,
+            ),
+        }
+        self.observation_space = spaces.Dict(obs_spaces)
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
@@ -701,9 +828,6 @@ def encode_choice_to_action_logits(
     box_i: int, rot_i: int, x_i: int, y_i: int,
     low: float = -10.0, high: float = 10.0
 ) -> np.ndarray:
-    """
-    Convert discrete choice into an action logits vector (one-hot style).
-    """
     action_dim = int(N + 6 + X + Y)
     a = np.full(action_dim, low, dtype=np.float32)
 
@@ -722,14 +846,6 @@ def encode_choice_to_action_logits(
 def decode_box_discrete_size_from_buffer(
     obs: Dict, box_slot: int, n_properties: int, bin_size: float
 ) -> np.ndarray:
-    """
-    Read size (dx,dy,dz) from obs['buffer'] for the box in a given slot.
-    buffer stores half-size*100, so:
-        half_size_m = value / 100
-        full_size_m = half_size_m * 2
-        d = int(full_size_m / bin_size)
-    Returns size in natural axis order (x,y,z).
-    """
     buf = obs["buffer"]
     base = box_slot * n_properties
     half_sizes_m = (buf[base : base + 3] / 100.0).astype(np.float32)
@@ -739,15 +855,29 @@ def decode_box_discrete_size_from_buffer(
 
 
 # ---------------------------
-# Sanity Check (safe sampling under STRICT bounds)
+# Sanity Check
 # ---------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, default="video/debug.mp4", help="Path to save video")
+
+    # UPDATED: default rigid; only --physics_mode soft enables soft contacts
+    parser.add_argument(
+        "--physics_mode",
+        type=str,
+        default=None,                 # None => rigid
+        choices=["rigid", "soft"],
+        help="Physics contact mode. Omit => rigid. Use 'soft' to enable soft contacts.",
+    )
+    parser.add_argument("--no_physics_obs", action="store_true", help="Disable physics-aware obs filling")
     args = parser.parse_args()
 
-    env = BoxPlanningEnvWrapper(save_video_path=args.video)
+    env = BoxPlanningEnvWrapper(
+        save_video_path=args.video,
+        physics_mode=args.physics_mode,
+        expose_physics_obs=(not args.no_physics_obs),
+    )
     obs, _ = env.reset(seed=0)
 
     N = env.N_visible_boxes
@@ -760,15 +890,11 @@ if __name__ == "__main__":
     step_count = 0
 
     while not done and step_count < 30:
-        # Choose a valid slot only (avoid padded empty slots)
         remaining = len(env.env.unplaced_box_ids)
         slot_max = max(1, min(remaining, N))
         box_i = int(rng.integers(0, slot_max))
-
-        # Random rotation id (0..5)
         rot_i = int(rng.integers(0, 6))
 
-        # Compute rotated (dx,dy) for strict in-bounds sampling
         dxyz = decode_box_discrete_size_from_buffer(
             obs, box_i, n_properties=env.env.n_properties, bin_size=env.env.bin_size
         )
@@ -785,7 +911,6 @@ if __name__ == "__main__":
         obs, reward, done, trunc, info = env.step(action)
         step_count += 1
 
-    # final metrics (volume utilization)
     metrics = compute_utilization_volume(env.env.obs["pallet_obs_density"])
     print("Finished. Steps:", step_count, "Done:", done)
     print(

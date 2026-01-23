@@ -132,24 +132,27 @@ class BaseHeuristic:
         """
         Convert buffer props -> discrete size (dx,dy,dz) in bins.
 
-        Buffer convention (from env._setup_references):
-          props[:3] = box_obj.size * 100
-          where box_obj.size is HALF-size in meters
-          => props[:3] is HALF-size in centimeters.
+        Must match env exactly:
 
-        Env uses:
-          size_bins = (box_obj.size * 2 / bin_size).astype(int)
+        env does:
+            box_size = (np.array(box_obj.size) * 2.0 / bin_size).astype(int)
 
-        Here we do a safe equivalent:
-          full_cm = 2 * half_cm
-          bins = ceil(full_cm / bin_cm)
+        Buffer stores:
+        props[:3] = box_obj.size * 100  (half-size in cm)
+
+        So:
+        half_m  = (half_cm / 100)
+        full_m  = 2 * half_m
+        bins    = (full_m / bin_size).astype(int)   # truncate, match env
         """
         half_cm = np.asarray(props[:3], dtype=np.float32)   # half-size in cm
-        full_cm = 2.0 * half_cm                             # full-size in cm
-        bin_cm = self.bin_size * 100.0                      # bin size in cm
+        half_m = half_cm / 100.0                            # half-size in meters
+        full_m = 2.0 * half_m                               # full-size in meters
 
-        # ceil is conservative: avoids underestimating footprint
-        return np.ceil(full_cm / bin_cm).astype(int)
+        dxyz = (full_m / float(self.bin_size)).astype(int)  # truncate like env
+        dxyz = np.maximum(dxyz, 1)                          # safety: avoid 0
+        return dxyz
+
 
     def rotate_size_bins(self, size_bins: np.ndarray, rot_id: int) -> np.ndarray:
         """
