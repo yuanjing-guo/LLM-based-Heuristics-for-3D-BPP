@@ -1,0 +1,115 @@
+{
+  "physics_mode": "rigid",
+  "expose_physics_obs": true,
+  "X": 25,
+  "Y": 25,
+  "H": 20,
+  "N_visible_boxes": 5,
+  "bin_size": 0.01,
+  "n_properties": 4,
+  "n_physics_properties": 2,
+  "rotations": 6,
+  "orders": {
+    "0": [
+      0,
+      1,
+      2
+    ],
+    "1": [
+      0,
+      2,
+      1
+    ],
+    "2": [
+      1,
+      0,
+      2
+    ],
+    "3": [
+      1,
+      2,
+      0
+    ],
+    "4": [
+      2,
+      0,
+      1
+    ],
+    "5": [
+      2,
+      1,
+      0
+    ]
+  },
+  "action_schema": {
+    "return_tuple": "(box_slot, rot_id, x, y)",
+    "logits_layout": "slot_logits[0:N] + rot_logits[N:N+6] + x_logits[N+6:N+6+X] + y_logits[N+6+X:N+6+X+Y]",
+    "constraints": [
+      "XY out-of-bounds raises RuntimeError (should be avoided by heuristic).",
+      "Z height overflow terminates episode gracefully (height_oob)."
+    ]
+  },
+  "termination_reasons": {
+    "0": "continue",
+    "2": "unstable",
+    "3": "success (all boxes placed)",
+    "4": "invalid_slot (box_slot >= remaining)",
+    "5": "height_oob"
+  },
+  "seed": 0,
+  "max_steps": 200,
+  "arg_soft": false,
+  "arg_expose_physics_obs": true,
+  "task_config": {
+    "buffer_size": 5,
+    "bin_size": 0.01,
+    "pallet": {
+      "size": [
+        0.25,
+        0.25,
+        0.02
+      ],
+      "max_pallet_height": 20
+    },
+    "box": {
+      "n_properties": 4,
+      "n_type": 4,
+      "type_dict_keys": [
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  },
+  "obs_schema": {
+    "pallet_obs_density": {
+      "shape": [
+        25,
+        25,
+        20
+      ],
+      "dtype": "float32"
+    },
+    "buffer": {
+      "shape": [
+        20
+      ],
+      "dtype": "float32"
+    },
+    "pallet_obs_softness": {
+      "shape": [
+        25,
+        25,
+        20
+      ],
+      "dtype": "float32"
+    },
+    "buffer_physics": {
+      "shape": [
+        10
+      ],
+      "dtype": "float32"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+=== Batch Evaluation Report ===
+Time: 2026-01-23_17-12-02
+Heuristics: empty_maximal_space
+Rounds: 10
+Max steps per episode: 200
+Save video: False
+
+--- Round 1/10 | seed=827538476 ---
+empty_maximal_space       util=0.679680  n_boxes= 35  term=2
+
+--- Round 2/10 | seed=310822069 ---
+empty_maximal_space       util=0.531840  n_boxes= 29  term=2
+
+--- Round 3/10 | seed=1814167446 ---
+empty_maximal_space       util=0.641280  n_boxes= 33  term=2
+
+--- Round 4/10 | seed=1673671287 ---
+empty_maximal_space       util=0.705280  n_boxes= 39  term=2
+
+--- Round 5/10 | seed=984846260 ---
+empty_maximal_space       util=0.648960  n_boxes= 37  term=2
+
+--- Round 6/10 | seed=1109094790 ---
+empty_maximal_space       util=0.625920  n_boxes= 33  term=2
+
+--- Round 7/10 | seed=476357000 ---
+empty_maximal_space       util=0.616320  n_boxes= 34  term=2
+
+--- Round 8/10 | seed=1002130699 ---
+empty_maximal_space       util=0.455040  n_boxes= 27  term=2
+
+--- Round 9/10 | seed=1904086561 ---
+empty_maximal_space       util=0.539520  n_boxes= 29  term=2
+
+--- Round 10/10 | seed=1656185802 ---
+empty_maximal_space       util=0.591360  n_boxes= 30  term=2
+
+
+=== Summary (mean / variance over rounds) ===
+
+[empty_maximal_space]
+  util:    mean=0.603520  var=0.005174
+  n_boxes: mean=32.600000  var=13.240000
+  term_reason_counts: {2: 10}
+
+=== Seeds (one per round) ===
+827538476, 310822069, 1814167446, 1673671287, 984846260, 1109094790, 476357000, 1002130699, 1904086561, 1656185802

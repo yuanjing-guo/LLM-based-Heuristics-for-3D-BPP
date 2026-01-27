@@ -4,7 +4,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 
-def call_llm(api_url: str, api_key: str, model: str, prompt: str) -> Optional[str]:
+def call_llm(api_url: str, api_key: str, model: str, prompt: str, timeout: int = 60) -> Optional[str]:
     
     #地址
     #这是HTTP请求头，用来告诉服务器“谁在请求、发的是什么数据”
@@ -27,7 +27,7 @@ def call_llm(api_url: str, api_key: str, model: str, prompt: str) -> Optional[st
     print("[LLM] request sent")
 
     try:
-        with urlopen(req, timeout=60) as resp: #发送 HTTP 请求，最多等 60 秒
+        with urlopen(req, timeout=timeout) as resp: #发送 HTTP 请求，最多等 60 秒
             raw = resp.read().decode("utf-8")  #读取服务器返回的数据（是字节），解码成字符串
             print("[LLM] raw response:", raw[:200])
             obj = json.loads(raw)  #把返回的 JSON 字符串解析成 Python 字典

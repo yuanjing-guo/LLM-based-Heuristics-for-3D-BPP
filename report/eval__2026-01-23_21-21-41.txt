@@ -1,0 +1,28 @@
+=== Batch Evaluation Report ===
+Time: 2026-01-23_21-21-41
+Heuristics: floor_building, extreme_point_physics
+Rounds: 1
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/1 | seed=359348639 ---
+floor_building            util=0.558720  n_boxes= 32  term=2
+extreme_point_physics     util=0.612480  n_boxes= 33  term=2
+
+
+=== Summary (mean / variance over rounds) ===
+
+[floor_building]
+  util:    mean=0.558720  var=0.000000
+  n_boxes: mean=32.000000  var=0.000000
+  term_reason_counts: {2: 1}
+
+[extreme_point_physics]
+  util:    mean=0.612480  var=0.000000
+  n_boxes: mean=33.000000  var=0.000000
+  term_reason_counts: {2: 1}
+
+=== Seeds (one per round) ===
+359348639

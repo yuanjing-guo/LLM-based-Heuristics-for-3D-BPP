@@ -8,7 +8,6 @@ def llm_policy(heur, obs):
     for slot_i in range(n_slots):
         if heur.slot_is_empty(obs, slot_i):
             continue
-        
         props = heur.get_slot_props(obs, slot_i)
         size_bins = heur.props_to_size_bins(props)
         if size_bins.size == 0 or np.any(size_bins <= 0):
@@ -18,7 +17,7 @@ def llm_policy(heur, obs):
             rotated = heur.rotate_size_bins(size_bins, rot_id)
             dx, dy, dz = rotated[0], rotated[1], rotated[2]
             
-            if dx <= 0 or dy <= 0 or dz <= 0:
+            if not heur.feasibility.is_within_pallet(0, 0, dx, dy):
                 continue
             
             for x in range(heur.X - dx + 1):
@@ -41,8 +40,8 @@ def llm_policy(heur, obs):
     
     return (0, 0, 0, 0)
 
-class GeneratedHeuristic(BaseHeuristic):
-    name = "llm_generated"
+class ArchivedHeuristic(BaseHeuristic):
+    name = "dumb"
 
     def __init__(self):
         super().__init__()

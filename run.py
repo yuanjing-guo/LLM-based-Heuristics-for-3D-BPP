@@ -1,7 +1,6 @@
 # run.py
 import argparse
 
-from env import BoxPlanningEnvWrapper
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
 from heuristics.llm_entry import LLMBasedHeuristic
@@ -10,8 +9,12 @@ from heuristics.extreme_point import ExtremePointPhysicsAware
 from heuristics.floor_building_buffer import FloorBuildingBuffer
 from heuristics.floor_building_buffer_rule_physics import FloorBuildingBufferRulePhysics
 
+from core.registry import build_registry
+from core.runner import run_episode, format_run_banner
+
+
 # ------------------------------------------------------------
-# Heuristic registry
+# Handcrafted Heuristic registry (static)
 # ------------------------------------------------------------
 HEURISTIC_REGISTRY = {
     "largest_volume_lowest_z": LargestVolumeLowestZ,
@@ -19,78 +22,43 @@ HEURISTIC_REGISTRY = {
     "llm_based": LLMBasedHeuristic,
     "empty_maximal_space": EMSOnline,
     "extreme_point": ExtremePointPhysicsAware,
-    "floor_building_buffer":FloorBuildingBuffer,
-    "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics
+    "floor_building_buffer": FloorBuildingBuffer,
+    "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics,
 }
 
 
-# ------------------------------------------------------------
-# Run one episode
-# ------------------------------------------------------------
-def run_episode(
-    heuristic,
-    max_steps: int = 200,
-    seed: int = 0,
-    save_video: bool = True,         # DEFAULT: save video
-    soft: bool = False,      # DEFAULT: rigid; only True => soft
-    expose_physics_obs: bool = True, # False -> physics obs fields filled with zeros
-) -> float:
-    physics_mode = "soft" if soft else "rigid"
-
-    video_path = (
-        f"video/{heuristic.name}__{physics_mode}.mp4"
-        if save_video
-        else None
-    )
-
-    env = BoxPlanningEnvWrapper(
-        save_video_path=video_path,
-        physics_mode=("soft" if soft else None),  # None => rigid default (per env policy)
-        expose_physics_obs=expose_physics_obs,
-    )
-
-    obs, _ = env.reset(seed=seed)
-    if hasattr(heuristic, "reset"):
-        heuristic.reset()
-
-    step = 0
-    done = False
-    last_util = 0.0
-
-    while (not done) and (step < max_steps):
-        action = heuristic(obs)
-        obs, reward, done, trunc, info = env.step(action)
-
-        step += 1
-        # terminal util is stored in info["util"] when done
-        last_util = float(info.get("util", info.get("util_current", 0.0)))
-
-    # Graceful cleanup (reduces EGL warnings)
-    if hasattr(env.env, "writer") and env.env.writer is not None:
-        env.env.writer.close()
-    del env
-
-    return float(last_util)
-
-
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
-if __name__ == "__main__":
+def parse_args(all_heuristics):
     parser = argparse.ArgumentParser()
 
+    # Normal run mode (non-debug): require --heuristic
     parser.add_argument(
         "--heuristic",
         type=str,
-        required=True,
-        choices=list(HEURISTIC_REGISTRY.keys()),
-        help="Which heuristic to run",
+        choices=all_heuristics,
+        help="Which heuristic to run (handcrafted or archived). Required when --debug is not set.",
     )
+
+    # Debug mode (explicit)
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable interactive debug loop. Only in this mode we ask for human feedback.",
+    )
+    parser.add_argument(
+        "--debug_start",
+        type=str,
+        default=None,
+        help=(
+            "Start point for debug mode. Use '0' to start from llm_based, "
+            "or specify any heuristic name from registry (including llm_archives). "
+            "Required when --debug is set."
+        ),
+    )
+
     parser.add_argument("--max_steps", type=int, default=200)
     parser.add_argument("--seed", type=int, default=0)
 
     # -------- Runtime env switches --------
-    # NEW: only a boolean switch; default is rigid
     parser.add_argument(
         "--soft",
         action="store_true",
@@ -107,42 +75,51 @@ if __name__ == "__main__":
         help="Disable video saving (default: video is saved).",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    heuristic_cls = HEURISTIC_REGISTRY[args.heuristic]
-    heuristic = heuristic_cls()
 
-    # --------------------------------------------------------
-    # Interactive loop (only relevant for LLM-based heuristic)
-    # --------------------------------------------------------
-    while True:
-        mode_str = "soft" if args.soft else "rigid"
+if __name__ == "__main__":
+    # Build runtime registry (handcrafted + llm_archives)
+    registry = build_registry(HEURISTIC_REGISTRY, include_archives=True)
+    all_heuristics = sorted(registry.keys())
+
+    args = parse_args(all_heuristics)
+
+    if args.debug:
+        # Debug loop is isolated in debug/cli.py (keeps run.py clean)
+        from debug.cli import run_debug_loop
+        run_debug_loop(args, registry, HEURISTIC_REGISTRY)
+
+    else:
+        if not args.heuristic:
+            raise SystemExit("ERROR: --heuristic is required when not using --debug.")
+
+        heuristic = registry[args.heuristic]()
+
         print(
-            "[Run] Heuristic={} | seed={} | max_steps={} | physics_mode={} | physics_obs={} | video={}".format(
-                heuristic.name,
-                args.seed,
-                args.max_steps,
-                mode_str,
-                "off" if args.no_physics_obs else "on",
-                "off" if args.no_video else "on",
+            format_run_banner(
+                heuristic_name=heuristic.name,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                soft=args.soft,
+                no_physics_obs=args.no_physics_obs,
+                no_video=args.no_video,
             )
         )
 
-        run_episode(
+        util = run_episode(
             heuristic,
             max_steps=args.max_steps,
             seed=args.seed,
             save_video=(not args.no_video),
             soft=args.soft,
             expose_physics_obs=(not args.no_physics_obs),
+            video_dir="video",
+            run_context_meta={
+            "seed": args.seed,
+            "max_steps": args.max_steps,
+            "soft": args.soft,
+            "expose_physics_obs": (not args.no_physics_obs),
+            },
         )
-
-        # Only LLM-based heuristic is expected to have regenerate()
-        if not hasattr(heuristic, "regenerate"):
-            break
-
-        feedback = input("输入反馈（直接回车退出）：").strip()
-        if not feedback:
-            break
-
-        heuristic.regenerate(feedback)
+        print(f"[Result] util={util:.4f}")

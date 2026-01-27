@@ -1,8 +1,6 @@
 from helpers.material import *
 
 class TaskConfig:
-    class physics:
-        mode = "rigid" #"soft"
     class train:
         exp_id = '1'
         mask_type = 'heuri'
@@ -21,10 +19,10 @@ class TaskConfig:
     class box:
         n_properties = 4
         type_dict = {
-            1: {"size":(0.03, 0.02, 0.02), "friction":(1.0, 0.005, 0.0001), "density":100, "softness": 3, "count": 10, "material":lightwood},
-            2: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":100, "softness": 3, "count": 10, "material":lightwood},
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 3, "count": 10, "material":lightwood},
+            2: {"size":(0.04, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.5, "count": 10, "material":lightwood},
             3: {"size":(0.04, 0.04, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.5, "count": 10, "material":darkwood},
-            4: {"size":(0.04, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.5, "count": 10, "material":darkwood},
+            4: {"size":(0.04, 0.04, 0.04), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 3, "count": 10, "material":darkwood},
         }
         # 48 * 10 + 64 * 10 + 27 * 5 + 48 * 10 + 64 * 10
         n_type = len(type_dict)
@@ -37,6 +35,7 @@ class TaskConfig:
     class pallet:
         size = (0.25, 0.25, 0.02)
         max_pallet_height = 20
+
         relative_table_displacement = (0, 0.4, 0.01)
         material=redwood
     

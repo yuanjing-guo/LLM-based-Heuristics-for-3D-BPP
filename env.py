@@ -283,7 +283,7 @@ class BoxPlanning(SingleArmEnv):
         )
         mujoco_arena.set_origin([0, 0, 0])
 
-        if self.init_box_pose_path is None:
+        if self.init_box_pose_path is not None:
             self._load_boxes_from_recorded_pose()
         else:
             self._load_boxes_random_pose()
@@ -329,9 +329,9 @@ class BoxPlanning(SingleArmEnv):
                 box_name = f"{box_type}_{j}"
                 box_obj = self.create_box(box_type, box_name)
 
-                init_x = random.uniform(-0.3, 0.3)
-                init_y = random.uniform(-0.8, -0.3)
-                init_z = random.uniform(0, 0.05) + (self.n_box_types - 1 - i) * 0.05
+                init_x = random.uniform(-0.7, 0.7)
+                init_y = random.uniform(-0.7, -0.3)
+                init_z = random.uniform(0, 0.2) + (self.n_box_types - 1 - i) * 0.05
 
                 box_obj.get_obj().set(
                     "pos",
@@ -756,7 +756,7 @@ class BoxPlanningEnvWrapper(gym.Env):
         super().__init__()
         self.env = BoxPlanning(
             save_video_path=save_video_path,
-            init_box_pose_path="./helpers/box_init_pose.npy",
+            init_box_pose_path=None,
             physics_mode=physics_mode,
             expose_physics_obs=expose_physics_obs,
         )

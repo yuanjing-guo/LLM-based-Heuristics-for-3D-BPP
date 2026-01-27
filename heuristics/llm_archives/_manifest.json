@@ -1,0 +1,37 @@
+{
+  "archives": [
+    {
+      "name": "my_best_v1",
+      "file": "heuristics/llm_archives/my_best_v1.py",
+      "saved_at": "2026-01-27 17:10:48",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "rigid",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "test",
+      "file": "heuristics/llm_archives/test.py",
+      "saved_at": "2026-01-27 18:22:26",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "rigid",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "dumb",
+      "file": "heuristics/llm_archives/dumb.py",
+      "saved_at": "2026-01-27 18:44:54",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "rigid",
+        "physics_obs": "on"
+      }
+    }
+  ]
+}

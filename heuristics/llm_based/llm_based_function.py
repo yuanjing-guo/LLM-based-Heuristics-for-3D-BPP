@@ -1,9 +1,22 @@
+# heuristics/llm_based/llm_based_function.py
 import os
+import json
 from typing import Optional
 
 from heuristics.llm_based.llm_interface import call_llm
 
+
+# ---------------------------
+# Code extraction (sanitize LLM output)
+# ---------------------------
+
 def _extract_code(text: str) -> str:
+    """
+    Extract only:
+      def llm_policy(heur, obs):
+        ...
+    Remove any import/from lines that the LLM might output.
+    """
     if "```" not in text:
         body = text.rstrip()
     else:
@@ -21,97 +34,227 @@ def _extract_code(text: str) -> str:
         if s.startswith("import ") or s.startswith("from "):
             continue
         cleaned_lines.append(line)
-    return "\n".join(cleaned_lines).rstrip()
+    body = "\n".join(cleaned_lines).rstrip()
 
-#生成给 LLM 的提示词（prompt）
-def build_prompt(previous_code: Optional[str], feedback: Optional[str]) -> str:
-    #basic rules (To-be-adjusted)
+    start = body.find("def llm_policy")
+    if start >= 0:
+        return body[start:].rstrip()
+    return body.rstrip()
+
+
+# ---------------------------
+# Run context injection
+# ---------------------------
+
+def _load_run_context(path: str = "runs/latest/run_context.json") -> Optional[dict]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
+    """
+    Facts only: schema + mode. This helps the LLM understand the mode without "cheating" via templates.
+    """
+    if not ctx:
+        return (
+            "[RUN CONTEXT]\n"
+            "No run_context.json found. Assume minimum schema:\n"
+            "- obs['pallet_obs_density'] is a 3D numpy array (X,Y,H)\n"
+            "- obs['buffer'] is a 1D numpy array of length (N*n_properties)\n"
+            "- action is a tuple (box_slot, rot_id, x, y)\n"
+            "- rot_id in [0..5]\n"
+        )
+
+    physics_mode = str(ctx.get("physics_mode", "rigid")).strip().lower()
+    expose_physics_obs = bool(ctx.get("expose_physics_obs", True))
+    X = ctx.get("X")
+    Y = ctx.get("Y")
+    H = ctx.get("H")
+    n_props = ctx.get("n_properties")
+
+    obs_schema = ctx.get("obs_schema", {})
+    action_schema = ctx.get("action_schema", {})
+
+    lines = []
+    lines.append("[RUN CONTEXT]")
+    lines.append(f"physics_mode={physics_mode}")
+    lines.append(f"expose_physics_obs={expose_physics_obs}")
+    if X is not None and Y is not None and H is not None:
+        lines.append(f"pallet_discrete=(X,Y,H)=({X},{Y},{H})")
+    if n_props is not None:
+        lines.append(f"n_properties={n_props}")
+
+    if isinstance(obs_schema, dict) and obs_schema:
+        lines.append("obs_schema:")
+        for k, v in obs_schema.items():
+            if isinstance(v, dict):
+                lines.append(f"- {k}: shape={v.get('shape', None)} dtype={v.get('dtype', None)}")
+            else:
+                lines.append(f"- {k}: {v}")
+
+    if isinstance(action_schema, dict) and action_schema:
+        lines.append("action_schema:")
+        for k, v in action_schema.items():
+            lines.append(f"- {k}: {v}")
+
+    if (physics_mode != "soft") or (not expose_physics_obs):
+        lines.append(
+            "MODE RULE: You MUST NOT use physics-aware fields such as "
+            "obs['buffer_physics'] or obs['pallet_obs_softness']."
+        )
+    else:
+        lines.append(
+            "MODE RULE: Soft mode with physics obs enabled. You MAY use physics-aware fields "
+            "ONLY if they are present in obs (check keys first)."
+        )
+
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------
+# Prompt (minimal, but MUST use feasibility correctly)
+# ---------------------------
+
+def build_prompt(
+    previous_code: Optional[str],
+    feedback: Optional[str],
+    feedback_history: Optional[list],
+    run_context: Optional[dict] = None,
+) -> str:
+    """
+    Goal:
+      - Start very naive (so it can improve via feedback),
+      - BUT never "naive to the point of ignoring feasibility".
+      - MUST compute z exactly like env.py does, then call feasibility methods to filter invalid actions.
+    """
+    ctx_block = _format_run_context_for_prompt(run_context)
+
     base = (
-        "Write ONLY the body of a Python function named llm_policy(heur, obs).\n"
-        "Return a tuple (box_slot, rot_id, x, y).\n"
-        "Use only these helpers from heur: get_slot_props(obs, slot_i), "
-        "slot_is_empty(obs, slot_i), props_to_size_bins(props), rotate_size_bins(size, rot_id).\n"
-        "obs only has 'buffer' and 'pallet_obs_density'.\n"
-        "Do NOT import anything. Do NOT define classes.\n"
-        "Indent each line by 4 spaces.\n"
-        "Return only the function body (no def line).\n"
-        "Use helper methods as heur.get_slot_props(...), heur.slot_is_empty(...), "
-        "heur.props_to_size_bins(...), heur.rotate_size_bins(...).\n"
-        "obs['buffer'] is a numpy array; do NOT use it in boolean context. "
-        "Use len(obs['buffer']) or obs['buffer'].size instead.\n"
-        "pallet_obs_density is 3D (X,Y,H); use heur.X, heur.Y, heur.H for sizes.\n"
-        "Before using props_to_size_bins, ensure the slot is not empty "
-        "(heur.slot_is_empty(obs, slot_i) == False).\n"
-        "If size_bins is empty or has any non‑positive values, skip that slot.\n"
-        "Do NOT access self.feasibility attributes; only call "
-        "heur.feasibility.is_within_pallet(...) and heur.feasibility.is_feasible(...).\n"
-        "slot_is_empty/get_slot_props only accept slot index (int), not (x,y,z).\n"
-        "Never use numpy arrays in boolean context (no `if size_bins` or `if obs['buffer']`). "
-        "Use size_bins.size > 0 or np.all(size_bins > 0).\n"
-        "Function body MUST NOT contain any import statements.\n"
-        "Call heur.feasibility.is_within_pallet(x, y, dx, dy) with 4 scalars. Never pass a tuple.\n"
-        "Call heur.feasibility.is_feasible(pallet_obs, x, y, dx, dy, dz, z) with 7 arguments. Do NOT pass box_slot/rot_id.\n"
-
+        ctx_block
+        + "\n"
+        + "Write Python code that defines ONLY a function named llm_policy(heur, obs).\n"
+        + "Return a tuple (box_slot, rot_id, x, y) using integers.\n"
+        + "\n"
+        + "ABSOLUTE RULES (must follow):\n"
+        + "- Do NOT import anything inside llm_policy (no 'import', no 'from').\n"
+        + "- Do NOT define classes.\n"
+        + "- Return ONLY the function code for llm_policy (including the def line). Nothing else.\n"
+        + "- You may use np.* WITHOUT importing numpy (np is available in the module).\n"
+        + "- NEVER use numpy arrays in boolean context (no `if arr:`). Use `.size`, `len(...)`, `np.any`, `np.all`.\n"
+        + "\n"
+        + "You MUST use ONLY these helper methods from heur:\n"
+        + "  * heur.slot_is_empty(obs, slot_i)\n"
+        + "  * heur.get_slot_props(obs, slot_i)\n"
+        + "  * heur.props_to_size_bins(props)\n"
+        + "  * heur.rotate_size_bins(size_bins, rot_id)\n"
+        + "\n"
+        + "Feasibility MUST be handled ONLY via these methods:\n"
+        + "  * heur.feasibility.is_within_pallet(x, y, dx, dy)\n"
+        + "  * heur.feasibility.is_feasible(pallet_obs, x, y, dx, dy, dz, z)\n"
+        + "- is_within_pallet takes 4 scalars; never pass tuples.\n"
+        + "- is_feasible takes exactly 7 args: (pallet_obs, x, y, dx, dy, dz, z).\n"
+        + "\n"
+        + "MODE RULES:\n"
+        + "- If physics_mode != soft OR expose_physics_obs == False: DO NOT use physics-aware fields.\n"
+        + "- If soft mode AND expose_physics_obs == True: you MAY use physics-aware fields only if present.\n"
+        + "\n"
+        + "NAIVE STRATEGY (required):\n"
+        + "- Implement the simplest correct strategy: scan slots from 0..n_slots-1, scan rotations 0..5,\n"
+        + "  then scan x,y in deterministic order and return the FIRST feasible action.\n"
+        + "- It does NOT need to be smart.\n"
+        + "- Correctness and strict feasibility filtering come first.\n"
+        + "\n"
+        + "Required implementation details (MUST follow exactly):\n"
+        + "- Use heur.X, heur.Y, heur.H for pallet bounds.\n"
+        + "- Determine number of visible slots ONLY like this:\n"
+        + "    n_slots = int(obs['buffer'].size // heur.n_properties)\n"
+        + "  then loop: for slot_i in range(n_slots):\n"
+        + "- rot_id must be in range(6).\n"
+        + "- If heur.slot_is_empty(obs, slot_i) -> continue.\n"
+        + "- size_bins = heur.props_to_size_bins(props). If size_bins.size==0 or any element<=0 -> continue.\n"
+        + "\n"
+        + "CRITICAL: z MUST be computed exactly like env.py computes it (do NOT guess z):\n"
+        + "- pallet = obs['pallet_obs_density']\n"
+        + "- For candidate (x,y,dx,dy):\n"
+        + "    place_area = pallet[x:x+dx, y:y+dy, :]\n"
+        + "    non_zero = np.any(place_area > 0, axis=(0,1))\n"
+        + "    z = int(np.max(np.nonzero(non_zero)) + 1) if np.any(non_zero) else 0\n"
+        + "- If z + dz > heur.H: continue (skip). This avoids height_oob.\n"
+        + "- THEN call heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z). If False -> continue.\n"
+        + "\n"
+        + "Loop bounds (avoid out-of-range slices):\n"
+        + "- When scanning x,y you MUST use:\n"
+        + "    for x in range(heur.X - dx + 1):\n"
+        + "        for y in range(heur.Y - dy + 1):\n"
+        + "\n"
+        + "If no feasible action is found, return (0, 0, 0, 0).\n"
     )
 
+    history_block = ""
+    if feedback_history:
+        history_block = "HARD CONSTRAINTS FROM HISTORY (must satisfy):\n- " + "\n- ".join(feedback_history)
+
+    if history_block:
+        base = history_block + "\nYou MUST keep all prior constraints.\n\n" + base
 
     if not previous_code:
-        return base + "\nStart from a simple deterministic policy."
+        return base + "\nStart from scratch with the naive approach.\n"
 
     return (
         base
         + "\nPrevious version:\n"
         + previous_code
-        + "\nUser feedback:\n"
+        + "\n\nHuman feedback for this revision:\n"
         + (feedback or "")
-        + "\nRevise the code accordingly."
+        + "\n\nRevise the code accordingly while keeping all rules.\n"
     )
 
-#生成 heuristic
-def generate_heuristic(api_url: str, api_key: str, model: str,
-                       previous_code: Optional[str], feedback: Optional[str]) -> Optional[str]:
-    prompt = build_prompt(previous_code, feedback)
+
+# ---------------------------
+# Generate
+# ---------------------------
+
+def generate_heuristic(
+    api_url: str,
+    api_key: str,
+    model: str,
+    previous_code: Optional[str],
+    feedback: Optional[str],
+    feedback_history: Optional[list],
+    run_context_path: str = "runs/latest/run_context.json",
+) -> Optional[str]:
+    run_ctx = _load_run_context(run_context_path)
+    prompt = build_prompt(previous_code, feedback, feedback_history, run_context=run_ctx)
+
     content = call_llm(api_url, api_key, model, prompt)
     if not content:
         print("[LLM] content is empty or None")
         return None
     print("[LLM] content head:", content[:200])
+
     code = _extract_code(content)
+
     print("[LLM] code head:", code[:200])
     print("[LLM] code length:", len(code))
     return code
 
-#把生成的代码写成一个 Python 文件
+
+# ---------------------------
+# Write generated heuristic (temp module)
+# ---------------------------
+
 def write_heuristic(path: str, code: str) -> None:
-    # 去掉首尾空行
-    lines = [ln.rstrip("\n") for ln in code.strip("\n").splitlines()]
-
-    # 计算最小缩进（忽略空行）
-    min_indent = None
-    for ln in lines:
-        if ln.strip() == "":
-            continue
-        leading = len(ln) - len(ln.lstrip(" "))
-        if min_indent is None or leading < min_indent:
-            min_indent = leading
-    if min_indent is None:
-        min_indent = 0
-
-    # 先去掉最小缩进，再统一加4空格
-    normalized = []
-    for ln in lines:
-        if ln.strip() == "":
-            normalized.append("")
-        else:
-            normalized.append(" " * 4 + ln[min_indent:])
-
-    indented = "\n".join(normalized)
-
+    """
+    Generated module will have numpy available as np.
+    LLM policy must NOT import numpy inside llm_policy.
+    """
     template = f"""import numpy as np
 from heuristics.base import BaseHeuristic
 
-def llm_policy(heur: BaseHeuristic, obs: dict):
-{indented}
+{code}
 
 class GeneratedHeuristic(BaseHeuristic):
     name = "llm_generated"
@@ -126,5 +269,3 @@ class GeneratedHeuristic(BaseHeuristic):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(template)
-
-
