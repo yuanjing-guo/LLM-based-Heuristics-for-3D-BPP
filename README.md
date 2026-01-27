@@ -131,3 +131,12 @@ Use offscreen rendering
 This repository is intended as a shared experimental platform.  
 Please keep changes modular and avoid breaking existing heuristics.  
 Built and tested on Ubuntu 22.04
+
+DEMO
+```
+uvicorn demo.web.app:app   --reload   --reload-exclude demo/_llm_demo_generated.py   --host 127.0.0.1 --port 8000
+```
+TEST
+```
+python run.py --debug --debug_start 0 --seed 0
+```
