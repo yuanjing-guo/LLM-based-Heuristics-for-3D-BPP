@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>LLM Palletization Demo</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    button { margin: 4px; padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    button:hover { background: #f6f6f6; }
+    input, select { margin: 4px; padding: 6px 8px; border-radius: 10px; border: 1px solid #ccc; }
+    #log {
+      height: 420px;
+      overflow: auto;
+      background: #0b0b0b;
+      color: #d8ffd8;
+      padding: 12px;
+      border-radius: 10px;
+      white-space: pre-wrap;
+    }
+    video { width: 100%; border-radius: 12px; background: #000; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .muted { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Controls</h2>
+
+    <div class="row">
+      <span class="muted">Buffer:</span>
+      <button onclick="setBuffer('first')">first</button>
+      <button onclick="setBuffer('full')">full</button>
+
+      <span class="muted" style="margin-left:10px;">Unstack:</span>
+      <button onclick="setUnstack('on')">on</button>
+      <button onclick="setUnstack('off')">off</button>
+
+      <button onclick="doReset()" style="margin-left:10px;">reset (naive)</button>
+    </div>
+
+    <div class="row" style="margin-top: 8px;">
+      <span class="muted">Seed</span>
+      <input id="seed" type="number" value="0" style="width: 90px;" />
+      <span class="muted">Steps</span>
+      <input id="steps" type="number" value="200" style="width: 110px;" />
+      <label class="muted"><input id="video" type="checkbox" checked /> video</label>
+      <button onclick="doEval()">eval</button>
+    </div>
+
+    <div class="row" style="margin-top: 8px;">
+      <span class="muted">Feedback</span>
+      <input id="fb" style="flex: 1; min-width: 320px;" placeholder="e.g. avoid height_oob; fill layer-by-layer; try x-scan then y-scan" />
+      <button onclick="doGen()">gen</button>
+    </div>
+
+    <div class="row" style="margin-top: 10px;">
+      <button onclick="refreshVideos()">refresh videos</button>
+      <select id="videoSel" onchange="playSelected()" style="flex: 1; min-width: 320px;"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Video</h2>
+    <video id="vid" controls></video>
+  </div>
+
+  <div class="card" style="grid-column: 1 / span 2;">
+    <h2>Logs</h2>
+    <div class="muted">实时输出（SSE）：gen/eval 的进度、util、错误等</div>
+    <pre id="log"></pre>
+  </div>
+
+<script>
+  async function post(url, body=null) {
+    const opts = { method: "POST" };
+    if (body !== null) {
+      opts.headers = { "Content-Type": "application/x-www-form-urlencoded" };
+      opts.body = new URLSearchParams(body).toString();
+    }
+    const res = await fetch(url, opts);
+    return await res.json();
+  }
+
+  async function setBuffer(mode){ await post(`/api/caps/buffer/${mode}`); }
+  async function setUnstack(mode){ await post(`/api/caps/unstack/${mode}`); }
+
+  async function doReset(){
+    await post("/api/reset");
+  }
+
+  async function doGen(){
+    const fb = document.getElementById("fb").value.trim();
+    if (!fb) return;
+    await post("/api/gen", { feedback: fb });
+  }
+
+  async function doEval(){
+    const seed = document.getElementById("seed").value;
+    const steps = document.getElementById("steps").value;
+    const video = document.getElementById("video").checked;
+    await post(`/api/eval?seed=${seed}&max_steps=${steps}&video=${video}`);
+    await refreshVideos();
+  }
+
+  async function refreshVideos(){
+    const r = await fetch("/api/videos");
+    const j = await r.json();
+    const sel = document.getElementById("videoSel");
+    sel.innerHTML = "";
+    j.videos.forEach(v=>{
+      const opt = document.createElement("option");
+      opt.value = v; opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    if (j.videos.length) {
+      sel.value = j.videos[0];
+      playSelected();
+    }
+  }
+
+  function playSelected(){
+    const v = document.getElementById("videoSel").value;
+    if (!v) return;
+    const vid = document.getElementById("vid");
+    vid.src = `/video_demo/${v}`;
+    vid.load();
+  }
+
+  // SSE logs
+  const logBox = document.getElementById("log");
+  const es = new EventSource("/api/logs");
+  es.onmessage = (ev) => {
+    logBox.textContent += ev.data + "\n";
+    logBox.scrollTop = logBox.scrollHeight;
+  };
+
+  refreshVideos();
+</script>
+</body>
+</html>

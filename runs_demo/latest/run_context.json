@@ -1,0 +1,14 @@
+{
+  "seed": 0,
+  "max_steps": 200,
+  "physics_mode": "rigid",
+  "expose_physics_obs": true,
+  "X": null,
+  "Y": null,
+  "H": null,
+  "soft": false,
+  "caps": {
+    "buffer": "full",
+    "unstack": "on"
+  }
+}
