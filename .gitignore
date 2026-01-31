@@ -33,3 +33,7 @@ video/
 # Editor
 .vscode/
 .idea/
+
+# MODEL
+lora_out/
+models/
