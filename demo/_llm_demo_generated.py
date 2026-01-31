@@ -2,62 +2,42 @@ import numpy as np
 from heuristics.base import BaseHeuristic
 
 def llm_policy(heur, obs):
-    # Get number of slots in buffer
+    pallet = obs['pallet_obs_density']
     n_slots = int(obs['buffer'].size // heur.n_properties)
     
-    # Get pallet density observation
-    pallet = obs['pallet_obs_density']
-    
-    # Scan slots in increasing order
     for slot_i in range(n_slots):
-        # Check if slot is empty
         if heur.slot_is_empty(obs, slot_i):
             continue
             
-        # Get box properties and convert to size bins
         props = heur.get_slot_props(obs, slot_i)
         size_bins = heur.props_to_size_bins(props)
         
-        # Try all rotations
         for rot_id in range(6):
-            # Get rotated dimensions
-            rotated_bins = heur.rotate_size_bins(size_bins, rot_id)
-            dx, dy, dz = rotated_bins
+            rotated = heur.rotate_size_bins(size_bins, rot_id)
+            dx, dy, dz = rotated
             
-            # Check if dimensions are valid
-            if dx <= 0 or dy <= 0 or dz <= 0:
+            if dx == 0 or dy == 0 or dz == 0:
                 continue
                 
-            # Check if box fits in pallet dimensions
-            if dx > heur.X or dy > heur.Y or dz > heur.H:
-                continue
-                
-            # Scan x, y positions in increasing order
             for x in range(heur.X - dx + 1):
                 for y in range(heur.Y - dy + 1):
-                    # Check if placement is within pallet bounds
                     if not heur.feasibility.is_within_pallet(x, y, dx, dy):
                         continue
                     
-                    # Calculate z height at this position
                     place_area = pallet[x:x+dx, y:y+dy, :]
                     non_zero = np.any(place_area > 0, axis=(0, 1))
                     
                     if np.any(non_zero):
-                        # Find highest occupied layer
                         z = int(np.max(np.nonzero(non_zero)) + 1)
                     else:
                         z = 0
                     
-                    # Check height constraint
                     if z + dz > heur.H:
                         continue
                     
-                    # Check feasibility
                     if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
                         return (slot_i, rot_id, x, y)
     
-    # No feasible placement found
     return (0, 0, 0, 0)
 
 def _clamp_action_if_needed(heur, obs, action):

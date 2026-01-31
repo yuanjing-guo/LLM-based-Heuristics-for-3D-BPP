@@ -4,6 +4,7 @@ import json
 from typing import Optional
 
 from heuristics.llm_based.llm_interface import call_llm
+from heuristics.llm_based.llm_interface_ollama import call_llm_ollama
 
 
 # ---------------------------
@@ -174,6 +175,19 @@ def build_prompt(
         + "  then loop: for slot_i in range(n_slots):\n"
         + "- rot_id must be in range(6).\n"
         + "- If heur.slot_is_empty(obs, slot_i) -> continue.\n"
+
+        #==================================================
+        # Interface Safety Constraints (DO NOT TUNE)
+        # Reason: prevent illegal use of slot_is_empty
+        #==================================================
+        + "- DO NOT negate slot_is_empty. Never write `not heur.slot_is_empty(...)`.\n"
+        + "- The only allowed pattern is:\n"
+        + "    if heur.slot_is_empty(obs, slot_i):\n"
+        + "        continue\n"
+        #==================================================
+        # End
+        #==================================================
+        
         + "- size_bins = heur.props_to_size_bins(props). If size_bins.size==0 or any element<=0 -> continue.\n"
         + "\n"
         + "CRITICAL: z MUST be computed exactly like env.py computes it (do NOT guess z):\n"
@@ -229,7 +243,14 @@ def generate_heuristic(
     run_ctx = _load_run_context(run_context_path)
     prompt = build_prompt(previous_code, feedback, feedback_history, run_context=run_ctx)
 
-    content = call_llm(api_url, api_key, model, prompt)
+    # Backend routing:
+    # - If api_url points to Ollama generate endpoint, use Ollama caller
+    # - Otherwise use the existing DeepSeek(OpenAI-style) caller
+    if "localhost:11434" in api_url or api_url.rstrip("/").endswith("/api/generate"):
+        content = call_llm_ollama(api_url, model, prompt)
+    else:
+        content = call_llm(api_url, api_key, model, prompt)
+
     if not content:
         print("[LLM] content is empty or None")
         return None

@@ -1,0 +1,15 @@
+FROM ./models/Qwen2.5-7B-Instruct-lora-merged
+
+# 生成代码建议更“稳”
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER num_predict 512
+
+# Qwen instruct 常见停止符（防止它一直续写）
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+SYSTEM """
+You generate correct Python code for heuristics.
+You MUST follow instructions strictly and output ONLY the requested code.
+"""

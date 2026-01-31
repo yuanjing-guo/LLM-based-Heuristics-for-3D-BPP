@@ -140,3 +140,80 @@ TEST
 ```
 python run.py --debug --debug_start 0 --seed 0
 ```
+
+
+
+
+
+## 本地模型新增文件说明书
+
+data/lora_sft/train.jsonl
+LoRA微调用的数据集目录 git
+
+train_lora.py
+LoRA微调主脚本 git
+
+lora_out
+LoRA训练产物
+
+merge_lora.py
+LoRA合并与模型封装 git
+
+models/
+存放本地模型 (很大 但是得用)
+
+Modelfile
+Ollama 基础模型定义 git
+
+Modelfile.qwen_lora
+Ollama+LoRA模型定义 git
+
+environment_lora.yaml
+LoRA环境所需依赖 git
+
+
+## llm-based heuristic 本地模型使用说明书
+## 0前提条件（只要装一次）
+
+Conda 环境：
+
+palletization（跑环境）
+
+Ollama 已安装
+
+模型已存在于 Ollama：   要看到：qwen-heuristic:lora
+
+```
+ollama list    
+```
+
+## 1启动Ollama
+
+打开一个新终端 而且这个终端要一直开着
+
+```
+ollama serve
+```
+
+## 2切到正确环境
+
+```
+conda activate palletization
+cd ~/llm_based_BPP
+```
+
+## 3设置环境变量
+
+```
+export MUJOCO_GL=glfw
+
+export LLM_API_URL="http://localhost:11434/api/generate"
+export LLM_MODEL="qwen-heuristic:lora"
+export LLM_API_KEY="dummy"
+```
+
+## 4正式启动
+
+```
+python run.py --heuristic llm_based --seed 0
+```

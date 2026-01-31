@@ -4,48 +4,78 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 
-def call_llm(api_url: str, api_key: str, model: str, prompt: str, timeout: int = 60) -> Optional[str]:
-    
-    #地址
-    #这是HTTP请求头，用来告诉服务器“谁在请求、发的是什么数据”
-    headers = {
-        "Authorization": f"Bearer {api_key}", #验证api
-        "Content-Type": "application/json",   #数据格式json
-    }
+def _is_ollama_generate(api_url: str) -> bool:
+    u = (api_url or "").strip().lower()
+    return ("localhost:11434" in u) or u.endswith("/api/generate") or (":11434/" in u)
 
-    ##数据
-    #聊天接口的标准请求格式json
+
+def call_llm(api_url: str, api_key: str, model: str, prompt: str, timeout: int = 120) -> Optional[str]:
+    """
+    Supports 2 backends:
+      1) Ollama: POST /api/generate  {model, prompt, stream:false}
+         returns: {"response": "...", ...}
+      2) OpenAI/DeepSeek chat.completions style:
+         POST ... {model, messages:[{role:"user",content:prompt}]}
+         returns: {"choices":[{"message":{"content":"..."}}]}
+    """
+
+    if _is_ollama_generate(api_url):
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = Request(api_url, data=data, headers=headers, method="POST")
+        print("[LLM][Ollama] request sent")
+
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                print("[LLM][Ollama] raw response:", raw[:200])
+                obj = json.loads(raw)
+                return obj.get("response", None)
+        except HTTPError as e:
+            print(f"[LLM][Ollama] HTTPError: {e.code} {e.reason}")
+            return None
+        except URLError as e:
+            print(f"[LLM][Ollama] URLError: {e.reason}")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"[LLM][Ollama] JSON decode error: {e}")
+            return None
+
+    # -------------------------
+    # DeepSeek / OpenAI style
+    # -------------------------
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
     }
-    #把 Python 字典变成可以发送的字节流
     data = json.dumps(payload).encode("utf-8")
-    
-    #创建一个 HTTP 请求对象，把所有信息封装好
-    req = Request(api_url, data=data, headers=headers, method="POST") #url API地址  method-POST一种请求方式
-    print("[LLM] request sent")
+    req = Request(api_url, data=data, headers=headers, method="POST")
+    print("[LLM][ChatCompletions] request sent")
 
     try:
-        with urlopen(req, timeout=timeout) as resp: #发送 HTTP 请求，最多等 60 秒
-            raw = resp.read().decode("utf-8")  #读取服务器返回的数据（是字节），解码成字符串
-            print("[LLM] raw response:", raw[:200])
-            obj = json.loads(raw)  #把返回的 JSON 字符串解析成 Python 字典
-            return obj["choices"][0]["message"]["content"] #从返回里拿模型输出文本并返回
-    
+        with urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8")
+            print("[LLM][ChatCompletions] raw response:", raw[:200])
+            obj = json.loads(raw)
+            return obj["choices"][0]["message"]["content"]
     except HTTPError as e:
-        print(f"[LLM] HTTPError: {e.code} {e.reason}")
+        print(f"[LLM][ChatCompletions] HTTPError: {e.code} {e.reason}")
         return None
-    
     except URLError as e:
-        print(f"[LLM] URLError: {e.reason}")
+        print(f"[LLM][ChatCompletions] URLError: {e.reason}")
         return None
-    
     except json.JSONDecodeError as e:
-        print(f"[LLM] JSON decode error: {e}")
+        print(f"[LLM][ChatCompletions] JSON decode error: {e}")
         return None
-    
     except (KeyError, IndexError) as e:
-        print(f"[LLM] Response format error: {e}")
-        # 如果需要，可以打印 raw 看原始返回
+        print(f"[LLM][ChatCompletions] Response format error: {e}")
         return None

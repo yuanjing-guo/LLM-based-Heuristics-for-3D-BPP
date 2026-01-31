@@ -1,0 +1,19 @@
+name: lora
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - pytorch-cuda=12.1
+  - numpy
+  - pip:
+      - transformers==4.44.2
+      - peft==0.12.0
+      - accelerate==0.34.2
+      - datasets==2.21.0
+      - bitsandbytes==0.43.3
+      - sentencepiece
+      - safetensors
