@@ -1,7 +1,7 @@
 # core/runner.py
 from typing import Optional, Dict, Any
 
-from env import BoxPlanningEnvWrapper
+from envs.env import BoxPlanningEnvWrapper
 
 
 def run_episode(
