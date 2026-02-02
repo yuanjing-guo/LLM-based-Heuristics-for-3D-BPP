@@ -3,9 +3,12 @@ import argparse
 
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
+from heuristics.empty_maximal_spaces import EmptyMaximalSpace
+from heuristics.extreme_point import ExtremePoint
+from heuristics.corner_point import CornerPoint
+from heuristics.first_fit import FirstFit
+from heuristics.best_fit import BestFit
 from heuristics.llm_entry import LLMBasedHeuristic
-from heuristics.empty_maximal_spaces import EMSOnline
-from heuristics.extreme_point import ExtremePointPhysicsAware
 from heuristics.floor_building_buffer import FloorBuildingBuffer
 from heuristics.floor_building_buffer_rule_physics import FloorBuildingBufferRulePhysics
 
@@ -19,6 +22,11 @@ from core.runner import run_episode, format_run_banner
 HEURISTIC_REGISTRY = {
     "largest_volume_lowest_z": LargestVolumeLowestZ,
     "floor_building": FloorBuilding,
+    "empty_maximal_space": EmptyMaximalSpace,
+    "extreme_point": ExtremePoint,
+    "corner_point": CornerPoint,
+    "first_fit": FirstFit,
+    "best_fit": BestFit,
     "llm_based": LLMBasedHeuristic,
     "empty_maximal_space": EMSOnline,
     "extreme_point": ExtremePointPhysicsAware,

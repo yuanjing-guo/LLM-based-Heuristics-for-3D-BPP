@@ -1,39 +1,36 @@
-# heuristics/ems_online.py
+# heuristics/corner_point_online.py
 import numpy as np
 from heuristics.base import BaseHeuristic
 
 
-class EmptyMaximalSpace(BaseHeuristic):
+class CornerPoint(BaseHeuristic):
     """
-    Online EMS-style 3D packing heuristic.
+    Online Corner Point heuristic for 3D bin packing.
 
-    - Single container (pallet)
-    - Top-loading (items placed from +z direction)
-    - EMS extracted from heightmap
-    - EMS order: lowest-z-first, then x, then y
+    - Single container
+    - Top-loading (z direction)
+    - Corner points derived from heightmap
+    - Candidate = (x, y, z) only
     """
 
-    name = "empty_maximal_space"
+    name = "corner_point"
 
     def __init__(self):
         super().__init__()
 
     # --------------------------------------------------
-    # EMS extraction from heightmap
+    # Corner point extraction from heightmap
     # --------------------------------------------------
-    def extract_ems(self, pallet: np.ndarray):
+    def extract_corner_points(self, pallet: np.ndarray):
         """
-        Extract top-loading EMS candidates from heightmap.
+        Extract corner points from heightmap.
 
-        Each EMS is represented as:
-            (z, x, y, dx_max, dy_max)
-
-        z  : placement height (top surface)
-        dx : max contiguous free extent in +x
-        dy : max contiguous free extent in +y
+        Each corner point is:
+            (x, y, z)
+        where z = heightmap[x, y]
         """
         X, Y, H = pallet.shape
-        ems_list = []
+        cps = []
 
         occ = pallet > 0
         has = occ.any(axis=2)
@@ -44,21 +41,11 @@ class EmptyMaximalSpace(BaseHeuristic):
         for x in range(X):
             for y in range(Y):
                 z = int(hmap[x, y])
+                cps.append((x, y, z))
 
-                dx = 0
-                while x + dx < X and hmap[x + dx, y] == z:
-                    dx += 1
-
-                dy = 0
-                while y + dy < Y and hmap[x, y + dy] == z:
-                    dy += 1
-
-                if dx > 0 and dy > 0:
-                    ems_list.append((z, x, y, dx, dy))
-
-        # >>> MOD <<<  top-loading EMS priority
-        ems_list.sort(key=lambda e: (e[0], e[1], e[2]))
-        return ems_list
+        # top-loading priority: lowest first
+        cps.sort(key=lambda p: (p[2], p[0], p[1]))
+        return cps
 
     # --------------------------------------------------
     # Main heuristic
@@ -67,15 +54,15 @@ class EmptyMaximalSpace(BaseHeuristic):
         pallet = obs["pallet_obs_density"]
         Kb = self.N  # visible items (IPS)
 
-        ems_list = self.extract_ems(pallet)
+        corner_points = self.extract_corner_points(pallet)
 
-        best_choice = None  # (slot, rot_id, x, y)
-        best_score = None   # larger is better
+        best_choice = None   # (slot, rot_id, x, y)
+        best_score = None
 
         # --------------------------------------------------
-        # Placement selection (single container, top-loading)
+        # Placement selection
         # --------------------------------------------------
-        for ems_idx, (z, ex, ey, dx_max, dy_max) in enumerate(ems_list):
+        for (x, y, z) in corner_points:
             for slot in range(Kb):
                 if self.slot_is_empty(obs, slot):
                     continue
@@ -86,26 +73,35 @@ class EmptyMaximalSpace(BaseHeuristic):
                 for rot_id in range(6):
                     dx, dy, dz = self.rotate_size_bins(size_bins, rot_id)
 
-                    if dx > dx_max or dy > dy_max:
+                    # boundary check
+                    if x + dx > pallet.shape[0] or y + dy > pallet.shape[1]:
                         continue
 
+                    # feasibility check (overlap + support)
                     if not self.feasibility.is_feasible(
                         pallet_obs=pallet,
-                        x=ex, y=ey,
+                        x=x, y=y,
                         dx=dx, dy=dy, dz=dz,
                         z=z,
                     ):
                         continue
 
-                    # >>> MOD <<<  top-loading placement score
-                    footprint_fill = (dx * dy) / (dx_max * dy_max)
+                    # ------------------------------------------
+                    # Corner Point placement score
+                    # ------------------------------------------
+                    # prefer larger footprint, lower height
+                    footprint = dx * dy
                     height_penalty = z
 
-                    score = (footprint_fill, -height_penalty)
+                    score = (footprint, -height_penalty)
 
                     if best_score is None or score > best_score:
                         best_score = score
-                        best_choice = (slot, rot_id, ex, ey)
+                        best_choice = (slot, rot_id, x, y)
+
+            # Corner-point-style early stop
+            if best_choice is not None:
+                break
 
         # --------------------------------------------------
         # Failure fallback

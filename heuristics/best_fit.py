@@ -1,39 +1,29 @@
-# heuristics/ems_online.py
+# heuristics/best_fit.py
 import numpy as np
 from heuristics.base import BaseHeuristic
 
 
-class EmptyMaximalSpace(BaseHeuristic):
+class BestFit(BaseHeuristic):
     """
-    Online EMS-style 3D packing heuristic.
+    Best-Fit 3D packing heuristic (top-loading).
 
-    - Single container (pallet)
-    - Top-loading (items placed from +z direction)
-    - EMS extracted from heightmap
-    - EMS order: lowest-z-first, then x, then y
+    - Single container
+    - Items placed from +z direction
+    - Candidate positions derived from heightmap
+    - Placement rule: select the best feasible position
     """
 
-    name = "empty_maximal_space"
+    name = "best_fit"
 
     def __init__(self):
         super().__init__()
 
     # --------------------------------------------------
-    # EMS extraction from heightmap
+    # Candidate position generation (same as First-Fit)
     # --------------------------------------------------
-    def extract_ems(self, pallet: np.ndarray):
-        """
-        Extract top-loading EMS candidates from heightmap.
-
-        Each EMS is represented as:
-            (z, x, y, dx_max, dy_max)
-
-        z  : placement height (top surface)
-        dx : max contiguous free extent in +x
-        dy : max contiguous free extent in +y
-        """
+    def extract_candidates(self, pallet: np.ndarray):
         X, Y, H = pallet.shape
-        ems_list = []
+        candidates = []
 
         occ = pallet > 0
         has = occ.any(axis=2)
@@ -54,28 +44,25 @@ class EmptyMaximalSpace(BaseHeuristic):
                     dy += 1
 
                 if dx > 0 and dy > 0:
-                    ems_list.append((z, x, y, dx, dy))
+                    candidates.append((z, x, y, dx, dy))
 
-        # >>> MOD <<<  top-loading EMS priority
-        ems_list.sort(key=lambda e: (e[0], e[1], e[2]))
-        return ems_list
+        # fixed spatial priority (same as First-Fit)
+        candidates.sort(key=lambda c: (c[0], c[1], c[2]))
+        return candidates
 
     # --------------------------------------------------
-    # Main heuristic
+    # Best-Fit placement
     # --------------------------------------------------
     def __call__(self, obs: dict) -> np.ndarray:
         pallet = obs["pallet_obs_density"]
-        Kb = self.N  # visible items (IPS)
+        Kb = self.N  # visible items
 
-        ems_list = self.extract_ems(pallet)
+        candidates = self.extract_candidates(pallet)
 
-        best_choice = None  # (slot, rot_id, x, y)
-        best_score = None   # larger is better
+        best_choice = None
+        best_score = None  # larger is better (tuple comparison)
 
-        # --------------------------------------------------
-        # Placement selection (single container, top-loading)
-        # --------------------------------------------------
-        for ems_idx, (z, ex, ey, dx_max, dy_max) in enumerate(ems_list):
+        for (z, x, y, dx_max, dy_max) in candidates:
             for slot in range(Kb):
                 if self.slot_is_empty(obs, slot):
                     continue
@@ -91,13 +78,15 @@ class EmptyMaximalSpace(BaseHeuristic):
 
                     if not self.feasibility.is_feasible(
                         pallet_obs=pallet,
-                        x=ex, y=ey,
+                        x=x, y=y,
                         dx=dx, dy=dy, dz=dz,
                         z=z,
                     ):
                         continue
 
-                    # >>> MOD <<<  top-loading placement score
+                    # ----------------------------------
+                    # Best-Fit scoring (local optimality)
+                    # ----------------------------------
                     footprint_fill = (dx * dy) / (dx_max * dy_max)
                     height_penalty = z
 
@@ -105,10 +94,10 @@ class EmptyMaximalSpace(BaseHeuristic):
 
                     if best_score is None or score > best_score:
                         best_score = score
-                        best_choice = (slot, rot_id, ex, ey)
+                        best_choice = (slot, rot_id, x, y)
 
         # --------------------------------------------------
-        # Failure fallback
+        # Commit best placement
         # --------------------------------------------------
         if best_choice is None:
             return self.encode_action_logits(0, 0, 0, 0)
