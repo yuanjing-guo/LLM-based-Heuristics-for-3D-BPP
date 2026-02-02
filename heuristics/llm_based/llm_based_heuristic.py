@@ -6,24 +6,24 @@ def llm_policy(heur, obs):
     if not hasattr(llm_policy, '_recent'):
         llm_policy._recent = []
     
-    # Get observation data
-    pallet = obs['pallet_obs_density']
-    buffer = obs['buffer']
-    pallet_softness = obs['pallet_obs_softness']
-    buffer_physics = obs['buffer_physics']
-    pallet_count = obs['pallet_count']
-    removable_mask = obs['removable_mask']
+    # Helper to check if action is recent
+    def is_recent(action_tuple):
+        return any(np.array_equal(np.array(action_tuple), np.array(prev)) for prev in llm_policy._recent)
     
-    # Constants
+    # Update recent actions (keep last 8)
+    if len(llm_policy._recent) >= 8:
+        llm_policy._recent.pop(0)
+    
+    pallet = obs['pallet_obs_density']
     X, Y, H = pallet.shape
     eps = 1e-6
-    n_slots = int(buffer.size // heur.n_properties)
     
-    # Helper to check if action repeats recent ones
-    def is_recent_action(action_tuple):
-        return action_tuple in llm_policy._recent
+    # PASS-1: Safe place (avoid hard-on-soft) with large box preference
+    n_slots = int(obs['buffer'].size // heur.n_properties)
     
-    # PASS-1: Safe place (avoid hard-on-soft)
+    # First, collect all safe candidates with their volume
+    safe_candidates = []
+    
     for slot_i in range(n_slots):
         if heur.slot_is_empty(obs, slot_i):
             continue
@@ -32,33 +32,35 @@ def llm_policy(heur, obs):
         props = heur.get_slot_props(obs, slot_i)
         size_bins = heur.props_to_size_bins(props)
         
-        # Get softness from buffer_physics
-        softness = 0.0
-        if 2 * slot_i + 0 < len(buffer_physics):
-            softness = float(buffer_physics[2 * slot_i + 0])
-        box_is_soft = (softness > 0.5)
+        # Get softness
+        if 2*slot_i + 0 < len(obs['buffer_physics']):
+            softness = float(obs['buffer_physics'][2*slot_i + 0])
+            box_is_soft = (softness > 0.5)
+        else:
+            box_is_soft = False
         box_is_hard = not box_is_soft
         
-        # Try all rotations
+        # Try rotations
         for rot_id in range(6):
             dx, dy, dz = [int(v) for v in heur.rotate_size_bins(size_bins, rot_id)]
+            volume = dx * dy * dz
             
-            # Try all positions
+            # Try positions
             for x in range(X):
                 for y in range(Y):
                     # Check within pallet
                     if not heur.feasibility.is_within_pallet(x, y, dx, dy):
                         continue
                     
-                    # Compute height
+                    # Compute z height
                     place_area = pallet[x:x+dx, y:y+dy, :]
-                    non_zero_mask = np.any(place_area > 0, axis=(0, 1))
+                    non_zero_mask = np.any(place_area > 0, axis=(0,1))
                     if np.any(non_zero_mask):
                         z = int(np.max(np.nonzero(non_zero_mask)) + 1)
                     else:
                         z = 0
                     
-                    # Check height overflow
+                    # Check height
                     if z + dz > H:
                         continue
                     
@@ -72,45 +74,52 @@ def llm_policy(heur, obs):
                     if not heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
                         continue
                     
-                    # Check hard-on-soft rule for PASS-1
+                    # Hard-on-soft check (only if z>0)
                     if box_is_hard and z > 0:
-                        support = pallet_softness[x:x+dx, y:y+dy, z-1]
-                        support_is_soft = (np.max(support) > 0.5)
-                        if support_is_soft:
+                        support = obs['pallet_obs_softness'][x:x+dx, y:y+dy, z-1]
+                        if support.size > 0 and np.max(support) > 0.5:
                             continue  # Reject hard-on-soft in PASS-1
                     
-                    # Check for repeat
-                    action_tuple = (0, slot_i, rot_id, x, y)
-                    if is_recent_action(action_tuple):
-                        continue
-                    
-                    # Update recent actions
-                    llm_policy._recent.append(action_tuple)
-                    if len(llm_policy._recent) > 8:
-                        llm_policy._recent.pop(0)
-                    
-                    return (0, slot_i, rot_id, x, y)
+                    action = (0, slot_i, rot_id, x, y)
+                    if not is_recent(action):
+                        safe_candidates.append((volume, action))
     
-    # PASS-2: Remove if possible
-    if pallet_count > 0 and len(removable_mask) > 0:
-        # Find removable indices
-        removable_indices = [idx for idx in range(pallet_count) if removable_mask[idx] > 0]
-        
+    # Sort safe candidates by volume (largest first) and return first non-recent
+    if safe_candidates:
+        safe_candidates.sort(key=lambda x: x[0], reverse=True)  # Sort by volume descending
+        for volume, action in safe_candidates:
+            if not is_recent(action):
+                llm_policy._recent.append(action)
+                return (int(action[0]), int(action[1]), int(action[2]), int(action[3]), int(action[4]))
+    
+    # PASS-2: Remove small boxes to make room for large ones
+    pallet_count = obs['pallet_count']
+    if pallet_count > 0 and 'removable_mask' in obs:
+        removable_indices = [i for i in range(pallet_count) if obs['removable_mask'][i] > 0]
         if removable_indices:
-            # Prefer LAST removable index (highest index)
-            for idx in reversed(removable_indices):
-                action_tuple = (1, idx, 0, 0, 0)
-                if is_recent_action(action_tuple):
-                    continue
+            # Find smallest removable box to replace
+            smallest_volume = float('inf')
+            smallest_idx = -1
+            
+            for idx in removable_indices:
+                # Get box footprint
+                fp = obs['pallet_footprints'][idx]
+                x, y, z, dx, dy, dz = fp
+                volume = dx * dy * dz
                 
-                # Update recent actions
-                llm_policy._recent.append(action_tuple)
-                if len(llm_policy._recent) > 8:
-                    llm_policy._recent.pop(0)
-                
-                return (1, idx, 0, 0, 0)
+                if volume < smallest_volume:
+                    smallest_volume = volume
+                    smallest_idx = idx
+            
+            if smallest_idx >= 0:
+                action = (1, smallest_idx, 0, 0, 0)
+                if not is_recent(action):
+                    llm_policy._recent.append(action)
+                    return (int(action[0]), int(action[1]), int(action[2]), int(action[3]), int(action[4]))
     
-    # PASS-3: Relax rule - allow hard-on-soft
+    # PASS-3: Relax rule (allow hard-on-soft) with large box preference
+    relaxed_candidates = []
+    
     for slot_i in range(n_slots):
         if heur.slot_is_empty(obs, slot_i):
             continue
@@ -120,6 +129,7 @@ def llm_policy(heur, obs):
         
         for rot_id in range(6):
             dx, dy, dz = [int(v) for v in heur.rotate_size_bins(size_bins, rot_id)]
+            volume = dx * dy * dz
             
             for x in range(X):
                 for y in range(Y):
@@ -127,7 +137,7 @@ def llm_policy(heur, obs):
                         continue
                     
                     place_area = pallet[x:x+dx, y:y+dy, :]
-                    non_zero_mask = np.any(place_area > 0, axis=(0, 1))
+                    non_zero_mask = np.any(place_area > 0, axis=(0,1))
                     if np.any(non_zero_mask):
                         z = int(np.max(np.nonzero(non_zero_mask)) + 1)
                     else:
@@ -144,23 +154,22 @@ def llm_policy(heur, obs):
                     if not heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
                         continue
                     
-                    action_tuple = (0, slot_i, rot_id, x, y)
-                    if is_recent_action(action_tuple):
-                        continue
-                    
-                    # Update recent actions
-                    llm_policy._recent.append(action_tuple)
-                    if len(llm_policy._recent) > 8:
-                        llm_policy._recent.pop(0)
-                    
-                    return (0, slot_i, rot_id, x, y)
+                    action = (0, slot_i, rot_id, x, y)
+                    if not is_recent(action):
+                        relaxed_candidates.append((volume, action))
     
-    # Last resort: default action
-    action_tuple = (0, 0, 0, 0, 0)
-    llm_policy._recent.append(action_tuple)
-    if len(llm_policy._recent) > 8:
-        llm_policy._recent.pop(0)
-    return (0, 0, 0, 0, 0)
+    # Sort relaxed candidates by volume (largest first)
+    if relaxed_candidates:
+        relaxed_candidates.sort(key=lambda x: x[0], reverse=True)  # Sort by volume descending
+        for volume, action in relaxed_candidates:
+            if not is_recent(action):
+                llm_policy._recent.append(action)
+                return (int(action[0]), int(action[1]), int(action[2]), int(action[3]), int(action[4]))
+    
+    # Last resort
+    action = (0, 0, 0, 0, 0)
+    llm_policy._recent.append(action)
+    return (int(action[0]), int(action[1]), int(action[2]), int(action[3]), int(action[4]))
 
 class GeneratedHeuristic(BaseHeuristic):
     name = "llm_generated"

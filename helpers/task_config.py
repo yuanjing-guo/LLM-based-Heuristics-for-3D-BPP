@@ -21,8 +21,8 @@ class TaskConfig:
         type_dict = {
             1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 16, "material":lightwood},
             2: {"size":(0.035, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 16, "material":lightwood},
-            3: {"size":(0.035, 0.035, 0.03), "friction":(1.0, 0.005, 0.0001), "density":50000, "softness": 0.2, "count": 16, "material":darkwood},
-            4: {"size":(0.035, 0.035, 0.035), "friction":(1.0, 0.005, 0.0001), "density":50000, "softness": 0.9, "count": 16, "material":darkwood},
+            3: {"size":(0.035, 0.035, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 16, "material":darkwood},
+            4: {"size":(0.035, 0.035, 0.035), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 16, "material":darkwood},
         }
         # 48 * 10 + 64 * 10 + 27 * 5 + 48 * 10 + 64 * 10
         n_type = len(type_dict)
