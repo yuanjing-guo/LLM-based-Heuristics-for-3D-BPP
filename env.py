@@ -286,7 +286,7 @@ class BoxPlanning(SingleArmEnv):
 
 
         # Boxes
-        if self.init_box_pose_path is not not None:
+        if self.init_box_pose_path is not None:
         
             self._load_boxes_from_recorded_pose()
         else:

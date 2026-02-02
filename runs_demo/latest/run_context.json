@@ -9,6 +9,6 @@
   "soft": false,
   "caps": {
     "buffer": "full",
-    "unstack": "on"
+    "unstack": "off"
   }
 }
