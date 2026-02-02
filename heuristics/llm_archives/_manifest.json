@@ -32,6 +32,17 @@
         "physics_mode": "rigid",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "firsttest_of_llm_unpacking",
+      "file": "heuristics/llm_archives/firsttest_of_llm_unpacking.py",
+      "saved_at": "2026-02-02 20:09:42",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
     }
   ]
 }

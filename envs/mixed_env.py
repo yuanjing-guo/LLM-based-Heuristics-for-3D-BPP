@@ -843,6 +843,7 @@ class MixedBoxPlanning(SingleArmEnv):
             info["error"] = "empty_front_slot"
             self.save_frame()
             print(f"[Step] op=PLACE slot={slot} rot_id={rot_id} -> empty slot")
+            print(f"[EnvDbg] slot={slot} rot={rot_id} x={x} y={y} env_size_after_rotate={dx,dy,dz}")
             done = False
             info = _attach_util_current(info)
             return self.obs, reward, done, info

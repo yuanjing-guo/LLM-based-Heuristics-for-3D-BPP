@@ -7,6 +7,7 @@ from heuristics.dummy_mixed import DummyMixed
 from core.registry import build_registry
 from core.runner import run_episode, format_run_banner
 from heuristics.dummy_mixed_remove import DummyMixedRemove
+from heuristics.test_height_debug import TestHeightDebug
 
 
 # ------------------------------------------------------------
@@ -16,6 +17,7 @@ HEURISTIC_REGISTRY = {
     #llm_based": LLMBasedHeuristic,
     "dummy_mixed": DummyMixed,
     "dummy_mixed_remove": DummyMixedRemove,
+    "test_height_debug": TestHeightDebug,
 }
 
 

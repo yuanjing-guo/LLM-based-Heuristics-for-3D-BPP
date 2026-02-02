@@ -1,7 +1,7 @@
 # heuristics/llm_based/llm_based_function.py
 import os
 import json
-from typing import Optional
+from typing import Optional, List
 
 from heuristics.llm_based.llm_interface import call_llm
 
@@ -56,7 +56,7 @@ def _load_run_context(path: str = "runs/latest/run_context.json") -> Optional[di
 
 def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
     """
-    Facts only: schema + mode. This helps the LLM understand the mode without "cheating" via templates.
+    Facts only: schema + mode.
     """
     if not ctx:
         return (
@@ -64,11 +64,12 @@ def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
             "No run_context.json found. Assume minimum schema:\n"
             "- obs['pallet_obs_density'] is a 3D numpy array (X,Y,H)\n"
             "- obs['buffer'] is a 1D numpy array of length (N*n_properties)\n"
-            "- action is a numpy int32 array of shape (5,): (op, a1, a2, a3, a4)"
-            "- op=0 PLACE: (0, slot, rot_id, x, y)"
-            "- op=1 REMOVE: (1, pallet_index, 0, 0, 0)"
-
+            "- action interface uses 5 integers: (op,a1,a2,a3,a4)\n"
+            "  op=0 PLACE: (0, slot, rot_id, x, y)\n"
+            "  op=1 REMOVE: (1, pallet_index, 0, 0, 0)\n"
             "- rot_id in [0..5]\n"
+            "- heur.X heur.Y heur.H heur.n_properties are valid\n"
+            "IMPORTANT: The returned 5-int action is passed DIRECTLY to env.step (NO logits encoding).\n"
         )
 
     physics_mode = str(ctx.get("physics_mode", "rigid")).strip().lower()
@@ -103,6 +104,10 @@ def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
         for k, v in action_schema.items():
             lines.append(f"- {k}: {v}")
 
+    # SUPER IMPORTANT: for Mixed env, action is raw int32[5]
+    lines.append("IMPORTANT: The returned 5-int action is passed DIRECTLY to env.step (NO logits encoding).")
+
+    # MODE RULE remains
     if (physics_mode != "soft") or (not expose_physics_obs):
         lines.append(
             "MODE RULE: You MUST NOT use physics-aware fields such as "
@@ -118,99 +123,158 @@ def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
 
 
 # ---------------------------
-# Prompt (minimal, but MUST use feasibility correctly)
+# Prompt builder
 # ---------------------------
 
 def build_prompt(
     previous_code: Optional[str],
     feedback: Optional[str],
-    feedback_history: Optional[list],
+    feedback_history: Optional[List[str]],
     run_context: Optional[dict] = None,
 ) -> str:
     """
-    Goal:
-      - Start very naive (so it can improve via feedback),
-      - BUT never "naive to the point of ignoring feasibility".
-      - MUST compute z exactly like env.py does, then call feasibility methods to filter invalid actions.
+    Mixed env aligned prompt:
+      - MUST return 5 ints as RAW action (env.step consumes directly).
+      - MUST compute z exactly env-style and enforce z+dz<=H.
+      - MUST enforce strict voxel non-overlap.
+      - MUST cast dx,dy,dz to int before any range/slicing.
+      - REMOVE a1 MUST be pallet_index (footprint index), NEVER a z/voxel coordinate.
+      - In soft+physics_obs mode (and keys exist), code MUST include hard/soft reasoning capability.
     """
     ctx_block = _format_run_context_for_prompt(run_context)
 
     base = (
         ctx_block
         + "\n"
-        + "Write Python code that defines ONLY a function named llm_policy(heur, obs).\n"
-        + "Return a tuple (box_slot, rot_id, x, y) using integers.\n"
+        + "You must output ONLY Python code that defines ONLY ONE function:\n"
+        + "    def llm_policy(heur, obs):\n"
+        + "Return EXACTLY 5 integers: (op, a1, a2, a3, a4).\n"
+        + "\n"
+        + "=== ENV INTERFACE (THIS IS GROUND TRUTH, DO NOT INVENT) ===\n"
+        + "Action is passed DIRECTLY to env.step as int32[5]. NO logits encoding.\n"
+        + "- PLACE:  op=0 -> [0, slot, rot_id, x, y]\n"
+        + "- REMOVE: op=1 -> [1, pallet_index, 0, 0, 0]\n"
+        + "\n"
+        + "Observation keys ALWAYS PRESENT in Mixed env:\n"
+        + "- obs['pallet_obs_density']: float32 array shape (X,Y,H)\n"
+        + "- obs['pallet_obs_softness']: float32 array shape (X,Y,H)  (filled only when expose_physics_obs=True)\n"
+        + "- obs['buffer']: float32 array shape (N_visible * heur.n_properties)\n"
+        + "- obs['buffer_physics']: float32 array shape (N_visible * 2) where stride=2:\n"
+        + "    softness = buffer_physics[2*slot + 0]   (float, in [0,1], >0.5 means SOFT)\n"
+        + "    mu       = buffer_physics[2*slot + 1]\n"
+        + "- obs['front_ids']: int32 array shape (N_visible). front_ids[slot] is the true box_id in env.\n"
+        + "- obs['pallet_count']: int\n"
+        + "- obs['pallet_footprints']: Python list length pallet_count.\n"
+        + "    each footprint fp = (x,y,z,dx,dy,dz) in DISCRETE bins.\n"
+        + "- obs['pallet_ids']: Python list length pallet_count. pallet_ids[idx] is box_id aligned with footprints[idx].\n"
+        + "- obs['removable_mask']: int8 array shape (pallet_count,), aligned with pallet_ids/footprints.\n"
+        + "    removable_mask[idx] > 0 means idx can be removed now.\n"
         + "\n"
         + "ABSOLUTE RULES (must follow):\n"
         + "- Do NOT import anything inside llm_policy (no 'import', no 'from').\n"
         + "- Do NOT define classes.\n"
-        + "- Return ONLY the function code for llm_policy (including the def line). Nothing else.\n"
-        + "- You may use np.* WITHOUT importing numpy (np is available in the module).\n"
-        + "- NEVER use numpy arrays in boolean context (no `if arr:`). Use `.size`, `len(...)`, `np.any`, `np.all`.\n"
+        + "- Do NOT define helper functions outside llm_policy.\n"
+        + "- You may use np.* WITHOUT importing numpy (np is available).\n"
+        + "- NEVER use numpy arrays in boolean context (no `if arr:`). Use np.any/np.all/len/size.\n"
+        + "- Always cast returned values to int.\n"
+        + "\n"
+        + "DX/DY/DZ TYPE RULE (MUST ALWAYS FOLLOW):\n"
+        + "- dx,dy,dz MUST be Python int before using range() or slicing.\n"
+        + "- Always do: dx, dy, dz = [int(v) for v in heur.rotate_size_bins(size_bins, rot_id)]\n"
+        + "\n"
+        + "HEIGHT COMPUTATION (MUST MATCH env.get_target_position_strict EXACTLY):\n"
+        + "- pallet = obs['pallet_obs_density']\n"
+        + "- place_area = pallet[x:x+dx, y:y+dy, :]\n"
+        + "- non_zero_mask = np.any(place_area > 0, axis=(0,1))\n"
+        + "- z = int(np.max(np.nonzero(non_zero_mask)) + 1) if np.any(non_zero_mask) else 0\n"
+        + "- If z + dz > heur.H: reject candidate (continue). NEVER return an action that can height_oob.\n"
+        + "\n"
+        + "STRICT NON-OVERLAP (MUST ALWAYS ENFORCE):\n"
+        + "- eps = 1e-6\n"
+        + "- blk = pallet[x:x+dx, y:y+dy, z:z+dz]\n"
+        + "- If blk.size==0: continue\n"
+        + "- If np.any(blk > eps): continue\n"
+        + "\n"
+        + "Feasibility API (EXACT signature):\n"
+        + "- heur.feasibility.is_within_pallet(x, y, dx, dy)  # 4 scalars\n"
+        + "- heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z)  # 7 args\n"
+        + "\n"
+        + "SLOT ITERATION (EXACT):\n"
+        + "- n_slots = int(obs['buffer'].size // heur.n_properties)\n"
+        + "- for slot_i in range(n_slots):\n"
+        + "\n"
+        + "=== REMOVE CONTRACT (FIXED, DO NOT GUESS) ===\n"
+        + "- REMOVE uses pallet_index which is an INDEX into obs['pallet_ids'] / obs['pallet_footprints'].\n"
+        + "- You MUST NEVER use z/top_z/voxel coordinate as pallet_index.\n"
+        + "- You MUST NEVER try to infer pallet_index from pallet_obs_density columns.\n"
+        + "- You MUST ONLY choose indices where removable_mask[idx] > 0.\n"
+        + "- If pallet_count==0 or removable_mask empty or no removable idx: DO NOT REMOVE.\n"
+        + "\n"
+        + "=== PHYSICS HARD/SOFT (FIXED FIELD SEMANTICS) ===\n"
+        + "You MUST implement the capability to reason about hard/soft, using EXACT fields:\n"
+        + "- Slot softness:\n"
+        + "    softness = float(obs['buffer_physics'][2*slot_i + 0]) if in bounds else 0.0\n"
+        + "    box_is_soft = (softness > 0.5)\n"
+        + "    box_is_hard = not box_is_soft\n"
+        + "- Support softness at placement (only meaningful when z>0):\n"
+        + "    support = obs['pallet_obs_softness'][x:x+dx, y:y+dy, z-1]\n"
+        + "    support_is_soft = (np.max(support) > 0.5)   # use max, NOT mean\n"
+        + "\n"
+        + "=== REQUIRED BEHAVIOR FOR THIS REVISION (you MUST implement) ===\n"
+        + "Goal: consider REMOVE actions to avoid putting HARD boxes on SOFT support.\n"
+        + "Algorithm (deterministic, no randomness):\n"
+        + "1) PASS-1 (safe place):\n"
+        + "   scan slot->rot->x->y and return the FIRST feasible PLACE that satisfies:\n"
+        + "   - height safe\n"
+        + "   - non-overlap\n"
+        + "   - feasible()\n"
+        + "   - if box_is_hard and z>0 and support_is_soft: REJECT this candidate in PASS-1\n"
+        + "2) PASS-2 (remove-then-place attempt):\n"
+        + "   If PASS-1 finds no action AND there exists removable boxes (removable_mask has >0):\n"
+        + "   choose ONE removable pallet_index and return REMOVE.\n"
+        + "   Selection rule MUST be deterministic and simple:\n"
+        + "   - Prefer the LAST removable index (highest index) to mimic top-removal.\n"
+        + "3) PASS-3 (relax rule):\n"
+        + "   If PASS-1 fails AND no removable exists, you MAY place hard-on-soft (ignore rule)\n"
+        + "   using the same first-feasible scan. (This matches: 'if not possible, ignore')\n"
+        + "\n"
+        + "=== ANTI-REPEAT RULE (MUST IMPLEMENT) ===\n"
+        + "To prevent repeated actions, llm_policy MUST remember recent actions using function attributes.\n"
+        + "- Maintain llm_policy._recent = list of last 8 actions (tuples of 5 ints).\n"
+        + "- Before returning an action, if it equals the most recent action, skip and search next candidate.\n"
+        + "- For REMOVE, also skip if same remove index was returned last step.\n"
+        + "- If no non-repeating action exists, return (0,0,0,0,0).\n"
+        + "\n"
+        + "IMPORTANT about (0,0,0,0,0):\n"
+        + "- This is interpreted as PLACE(slot=0,rot=0,x=0,y=0) by env.\n"
+        + "- Only return it as a LAST RESORT when absolutely no other action exists.\n"
         + "\n"
         + "You MUST use ONLY these helper methods from heur:\n"
         + "  * heur.slot_is_empty(obs, slot_i)\n"
         + "  * heur.get_slot_props(obs, slot_i)\n"
         + "  * heur.props_to_size_bins(props)\n"
         + "  * heur.rotate_size_bins(size_bins, rot_id)\n"
-        + "\n"
-        + "Feasibility MUST be handled ONLY via these methods:\n"
-        + "  * heur.feasibility.is_within_pallet(x, y, dx, dy)\n"
-        + "  * heur.feasibility.is_feasible(pallet_obs, x, y, dx, dy, dz, z)\n"
-        + "- is_within_pallet takes 4 scalars; never pass tuples.\n"
-        + "- is_feasible takes exactly 7 args: (pallet_obs, x, y, dx, dy, dz, z).\n"
-        + "\n"
-        + "MODE RULES:\n"
-        + "- If physics_mode != soft OR expose_physics_obs == False: DO NOT use physics-aware fields.\n"
-        + "- If soft mode AND expose_physics_obs == True: you MAY use physics-aware fields only if present.\n"
-        + "\n"
-        + "NAIVE STRATEGY (required):\n"
-        + "- Implement the simplest correct strategy: scan slots from 0..n_slots-1, scan rotations 0..5,\n"
-        + "  then scan x,y in deterministic order and return the FIRST feasible action.\n"
-        + "- It does NOT need to be smart.\n"
-        + "- Correctness and strict feasibility filtering come first.\n"
-        + "\n"
-        + "Required implementation details (MUST follow exactly):\n"
-        + "- Use heur.X, heur.Y, heur.H for pallet bounds.\n"
-        + "- Determine number of visible slots ONLY like this:\n"
-        + "    n_slots = int(obs['buffer'].size // heur.n_properties)\n"
-        + "  then loop: for slot_i in range(n_slots):\n"
-        + "- rot_id must be in range(6).\n"
-        + "- If heur.slot_is_empty(obs, slot_i) -> continue.\n"
-        + "- size_bins = heur.props_to_size_bins(props). If size_bins.size==0 or any element<=0 -> continue.\n"
-        + "\n"
-        + "CRITICAL: z MUST be computed exactly like env.py computes it (do NOT guess z):\n"
-        + "- pallet = obs['pallet_obs_density']\n"
-        + "- For candidate (x,y,dx,dy):\n"
-        + "    place_area = pallet[x:x+dx, y:y+dy, :]\n"
-        + "    non_zero = np.any(place_area > 0, axis=(0,1))\n"
-        + "    z = int(np.max(np.nonzero(non_zero)) + 1) if np.any(non_zero) else 0\n"
-        + "- If z + dz > heur.H: continue (skip). This avoids height_oob.\n"
-        + "- THEN call heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z). If False -> continue.\n"
-        + "\n"
-        + "Loop bounds (avoid out-of-range slices):\n"
-        + "- When scanning x,y you MUST use:\n"
-        + "    for x in range(heur.X - dx + 1):\n"
-        + "        for y in range(heur.Y - dy + 1):\n"
-        + "\n"
-        + "If no feasible action is found, return (0, 0, 0, 0).\n"
     )
+
 
     history_block = ""
     if feedback_history:
-        history_block = "HARD CONSTRAINTS FROM HISTORY (must satisfy):\n- " + "\n- ".join(feedback_history)
+        items = [str(x).strip() for x in feedback_history if str(x).strip()]
+        if items:
+            history_block = "HARD CONSTRAINTS FROM HISTORY (must satisfy, never remove):\n- " + "\n- ".join(items)
 
     if history_block:
-        base = history_block + "\nYou MUST keep all prior constraints.\n\n" + base
+        base = history_block + "\n\nYou MUST keep all prior constraints.\n\n" + base
 
     if not previous_code:
-        return base + "\nStart from scratch with the naive approach.\n"
+        return base + "\nStart from scratch with the default strategy.\n"
 
     return (
         base
         + "\nPrevious version:\n"
         + previous_code
-        + "\n\nHuman feedback for this revision:\n"
+        + "\n\nHuman feedback for this revision (natural language). "
+          "Only implement advanced behavior if explicitly requested here:\n"
         + (feedback or "")
         + "\n\nRevise the code accordingly while keeping all rules.\n"
     )
@@ -226,7 +290,7 @@ def generate_heuristic(
     model: str,
     previous_code: Optional[str],
     feedback: Optional[str],
-    feedback_history: Optional[list],
+    feedback_history: Optional[List[str]],
     run_context_path: str = "runs/latest/run_context.json",
 ) -> Optional[str]:
     run_ctx = _load_run_context(run_context_path)
@@ -251,8 +315,11 @@ def generate_heuristic(
 
 def write_heuristic(path: str, code: str) -> None:
     """
-    Generated module will have numpy available as np.
-    LLM policy must NOT import numpy inside llm_policy.
+    Mixed env expects RAW int32[5] actions.
+
+    llm_policy returns 5 integers:
+      - PLACE: (0, slot, rot_id, x, y)  -> returned as np.int32[5]
+      - REMOVE: (1, pallet_index, 0, 0, 0) -> returned as np.int32[5]
     """
     template = f"""import numpy as np
 from heuristics.base import BaseHeuristic
@@ -266,8 +333,24 @@ class GeneratedHeuristic(BaseHeuristic):
         super().__init__()
 
     def __call__(self, obs):
-        box_slot, rot_id, x, y = llm_policy(self, obs)
-        return self.encode_action_logits(box_slot, rot_id, x, y)
+        out = llm_policy(self, obs)
+
+        # robust unpack
+        if isinstance(out, (list, tuple, np.ndarray)):
+            out = list(out)
+        else:
+            out = [out]
+
+        # pad / truncate to 5
+        while len(out) < 5:
+            out.append(0)
+        if len(out) > 5:
+            out = out[:5]
+
+        op, a1, a2, a3, a4 = [int(x) for x in out]
+
+        # IMPORTANT: Mixed env consumes raw int32[5] directly (no logits)
+        return np.array([op, a1, a2, a3, a4], dtype=np.int32)
 """
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

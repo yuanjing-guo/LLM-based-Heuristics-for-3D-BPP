@@ -42,8 +42,13 @@
     ]
   },
   "action_schema": {
-    "return_tuple": "(box_slot, rot_id, x, y)",
-    "logits_layout": "slot_logits[0:N] + rot_logits[N:N+6] + x_logits[N+6:N+6+X] + y_logits[N+6+X:N+6+X+Y]",
+    "llm_policy_return": "(op, a1, a2, a3, a4)  # 5 ints",
+    "discrete_action_semantics": {
+      "0": "PLACE -> (0, slot, rot_id, x, y)",
+      "1": "REMOVE -> (1, pallet_index, 0, 0, 0)"
+    },
+    "place_logits_layout": "slot_logits[0:N] + rot_logits[N:N+6] + x_logits[N+6:N+6+X] + y_logits[N+6+X:N+6+X+Y]",
+    "supports_remove_action": true,
     "constraints": [
       "XY out-of-bounds raises RuntimeError (should be avoided by heuristic).",
       "Z height overflow terminates episode gracefully (height_oob)."
@@ -56,7 +61,7 @@
     "4": "invalid_slot (box_slot >= remaining)",
     "5": "height_oob"
   },
-  "seed": 4,
+  "seed": 0,
   "max_steps": 200,
   "arg_soft": true,
   "arg_expose_physics_obs": true,
@@ -111,5 +116,7 @@
       ],
       "dtype": "float32"
     }
-  }
+  },
+  "llm_policy_interface": "5-int action (op,a1,a2,a3,a4)",
+  "supports_remove_action": true
 }

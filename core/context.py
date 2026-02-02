@@ -58,13 +58,24 @@ def collect_run_context(
             "5": [2, 1, 0],
         },
         "action_schema": {
-            "return_tuple": "(box_slot, rot_id, x, y)",
-            "logits_layout": "slot_logits[0:N] + rot_logits[N:N+6] + x_logits[N+6:N+6+X] + y_logits[N+6+X:N+6+X+Y]",
-            "constraints": [
-                "XY out-of-bounds raises RuntimeError (should be avoided by heuristic).",
-                "Z height overflow terminates episode gracefully (height_oob).",
-            ],
+                # what LLM policy is required to output
+                "llm_policy_return": "(op, a1, a2, a3, a4)  # 5 ints",
+                "discrete_action_semantics": {
+                    "0": "PLACE -> (0, slot, rot_id, x, y)",
+                    "1": "REMOVE -> (1, pallet_index, 0, 0, 0)"
+                },
+
+                # how the environment / wrapper currently expects actions
+                # keep this if you still use encode_action_logits for PLACE
+                "place_logits_layout": "slot_logits[0:N] + rot_logits[N:N+6] + x_logits[N+6:N+6+X] + y_logits[N+6+X:N+6+X+Y]",
+                "supports_remove_action": True,  # set False if env cannot execute REMOVE yet
+
+                "constraints": [
+                    "XY out-of-bounds raises RuntimeError (should be avoided by heuristic).",
+                    "Z height overflow terminates episode gracefully (height_oob)."
+                ]
         },
+
         "termination_reasons": {
             "0": "continue",
             "2": "unstable",

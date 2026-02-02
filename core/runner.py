@@ -31,6 +31,8 @@ def run_episode(
         from core.context import collect_run_context, write_latest_run_context
 
         meta = run_context_meta or {}
+        meta.setdefault("llm_policy_interface", "5-int action (op,a1,a2,a3,a4)")
+        meta.setdefault("supports_remove_action", True)
         ctx = collect_run_context(
             env,
             seed=meta.get("seed", seed),
@@ -38,7 +40,9 @@ def run_episode(
             soft=meta.get("soft", soft),
             expose_physics_obs=meta.get("expose_physics_obs", expose_physics_obs),
         )
-        outp = write_latest_run_context(ctx)
+        ctx["llm_policy_interface"] = meta["llm_policy_interface"]
+        ctx["supports_remove_action"] = bool(meta["supports_remove_action"])
+        write_latest_run_context(ctx)
         print(f"[Context] wrote: {outp}")
     except Exception as e:
         print(f"[Context] write failed: {e}")
