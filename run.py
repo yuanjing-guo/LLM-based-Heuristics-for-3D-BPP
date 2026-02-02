@@ -1,29 +1,21 @@
 # run.py
 import argparse
 
-from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
-from heuristics.floor_building import FloorBuilding
-from heuristics.llm_entry import LLMBasedHeuristic
-from heuristics.empty_maximal_spaces import EMSOnline
-from heuristics.extreme_point import ExtremePointPhysicsAware
-from heuristics.floor_building_buffer import FloorBuildingBuffer
-from heuristics.floor_building_buffer_rule_physics import FloorBuildingBufferRulePhysics
 
+# from heuristics.llm_entry import LLMBasedHeuristic
+from heuristics.dummy_mixed import DummyMixed
 from core.registry import build_registry
 from core.runner import run_episode, format_run_banner
+from heuristics.dummy_mixed_remove import DummyMixedRemove
 
 
 # ------------------------------------------------------------
 # Handcrafted Heuristic registry (static)
 # ------------------------------------------------------------
 HEURISTIC_REGISTRY = {
-    "largest_volume_lowest_z": LargestVolumeLowestZ,
-    "floor_building": FloorBuilding,
-    "llm_based": LLMBasedHeuristic,
-    "empty_maximal_space": EMSOnline,
-    "extreme_point": ExtremePointPhysicsAware,
-    "floor_building_buffer": FloorBuildingBuffer,
-    "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics,
+    #llm_based": LLMBasedHeuristic,
+    "dummy_mixed": DummyMixed,
+    "dummy_mixed_remove": DummyMixedRemove,
 }
 
 

@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-from envs.env import BoxPlanningEnvWrapper
+from envs.mixed_env import BoxPlanningEnvWrapper
 
 def _write_latest_run_context(ctx: Dict[str, Any]) -> str:
     import json

@@ -2,7 +2,7 @@
 
 import numpy as np
 from heuristics.base import BaseHeuristic
-from envs.env import encode_choice_to_action_logits
+from envs.mixed_env import encode_choice_to_action_logits
 
 
 class LargestVolumeLowestZ(BaseHeuristic):

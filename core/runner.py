@@ -1,7 +1,7 @@
 # core/runner.py
 from typing import Optional, Dict, Any
 
-from envs.env import BoxPlanningEnvWrapper
+from envs.mixed_env import MixedBoxPlanningEnvWrapper
 
 
 def run_episode(
@@ -20,7 +20,7 @@ def run_episode(
     if save_video:
         video_path = f"{video_dir}/{heuristic.name}__{physics_mode}.mp4"
 
-    env = BoxPlanningEnvWrapper(
+    env = MixedBoxPlanningEnvWrapper(
         save_video_path=video_path,
         physics_mode=("soft" if soft else None),
         expose_physics_obs=expose_physics_obs,
@@ -58,8 +58,20 @@ def run_episode(
         step += 1
         last_util = float(info.get("util", info.get("util_current", 0.0)))
 
+        # close video
     if hasattr(env.env, "writer") and env.env.writer is not None:
         env.env.writer.close()
+
+    # explicit robosuite / mujoco cleanup
+    try:
+        env.env.close()
+    except Exception:
+        pass
+    try:
+        env.close()
+    except Exception:
+        pass
+
     del env
 
     return float(last_util)

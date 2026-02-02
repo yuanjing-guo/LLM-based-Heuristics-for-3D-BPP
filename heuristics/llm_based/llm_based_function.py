@@ -64,7 +64,10 @@ def _format_run_context_for_prompt(ctx: Optional[dict]) -> str:
             "No run_context.json found. Assume minimum schema:\n"
             "- obs['pallet_obs_density'] is a 3D numpy array (X,Y,H)\n"
             "- obs['buffer'] is a 1D numpy array of length (N*n_properties)\n"
-            "- action is a tuple (box_slot, rot_id, x, y)\n"
+            "- action is a numpy int32 array of shape (5,): (op, a1, a2, a3, a4)"
+            "- op=0 PLACE: (0, slot, rot_id, x, y)"
+            "- op=1 REMOVE: (1, pallet_index, 0, 0, 0)"
+
             "- rot_id in [0..5]\n"
         )
 

@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 
-from envs.env import BoxPlanningEnvWrapper, compute_utilization_volume
+from envs.mixed_env import BoxPlanningEnvWrapper, compute_utilization_volume
 from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
 from heuristics.floor_building import FloorBuilding
 from heuristics.llm_entry import LLMBasedHeuristic
