@@ -28,8 +28,6 @@ HEURISTIC_REGISTRY = {
     "first_fit": FirstFit,
     "best_fit": BestFit,
     "llm_based": LLMBasedHeuristic,
-    "empty_maximal_space": EMSOnline,
-    "extreme_point": ExtremePointPhysicsAware,
     "floor_building_buffer": FloorBuildingBuffer,
     "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics,
 }
