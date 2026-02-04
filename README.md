@@ -144,3 +144,18 @@ SOFT TEST
 ```
 python run.py --debug --debug_start 0 --seed 0 --soft
 ```
+
+## 8. Experiment
+
+'''
+hand-crafted heuristics:
+first_fit
+best_fit
+corner_point
+extreme_point
+floor_building
+empty_maximal_spaces   #all these heuristics have taken buffer into consideration.
+'''
+llm_based heuristics:
+todo...
+'''
