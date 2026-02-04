@@ -32,6 +32,17 @@
         "physics_mode": "rigid",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "my_best_heuristic_no_physics",
+      "file": "heuristics/llm_archives/my_best_heuristic_no_physics.py",
+      "saved_at": "2026-02-04 13:48:09",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "rigid",
+        "physics_obs": "on"
+      }
     }
   ]
 }

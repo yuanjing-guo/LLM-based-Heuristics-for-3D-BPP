@@ -140,3 +140,7 @@ TEST
 ```
 python run.py --debug --debug_start 0 --seed 0
 ```
+SOFT TEST
+```
+python run.py --debug --debug_start 0 --seed 0 --soft
+```
