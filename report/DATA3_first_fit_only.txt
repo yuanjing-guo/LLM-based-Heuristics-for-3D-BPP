@@ -1,0 +1,34 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-05_16-56-36
+Heuristics: first_fit
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=982013628 ---
+first_fit                 util=0.502240  n_boxes= 38  term=term_5
+
+--- Round 2/5 | seed=1064163414 ---
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+--- Round 3/5 | seed=628873056 ---
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+--- Round 4/5 | seed=1331714060 ---
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+--- Round 5/5 | seed=535915370 ---
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+
+=== Summary (mean / variance over rounds) ===
+
+[first_fit]
+  util:    mean=0.529888  var=0.000191
+  n_boxes: mean=39.600000  var=0.640000
+  term_counts: {'success': 4, 'term_5': 1}
+
+=== Seeds (one per round) ===
+982013628, 1064163414, 628873056, 1331714060, 535915370

@@ -1,0 +1,24 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-05_15-42-17
+Heuristics: floor_building, empty_maximal_space, best_fit, first_fit
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=1233601347 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.353200  n_boxes= 27  term=unstable
+
+--- Round 2/5 | seed=1979839369 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.502240  n_boxes= 38  term=term_5
+
+--- Round 3/5 | seed=136284603 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success

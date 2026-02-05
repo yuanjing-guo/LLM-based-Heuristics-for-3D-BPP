@@ -1,0 +1,79 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-05_15-13-52
+Heuristics: floor_building, empty_maximal_space, best_fit
+Rounds: 10
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/10 | seed=1646850688 ---
+floor_building            util=0.634240  n_boxes= 25  term=term_5
+empty_maximal_space       util=0.600960  n_boxes= 21  term=term_5
+best_fit                  util=0.675840  n_boxes= 25  term=term_5
+
+--- Round 2/10 | seed=2084452586 ---
+floor_building            util=0.702720  n_boxes= 25  term=term_5
+empty_maximal_space       util=0.773760  n_boxes= 25  term=term_5
+best_fit                  util=0.773760  n_boxes= 25  term=term_5
+
+--- Round 3/10 | seed=1173561140 ---
+floor_building            util=0.654720  n_boxes= 25  term=term_5
+empty_maximal_space       util=0.698240  n_boxes= 24  term=term_5
+best_fit                  util=0.750080  n_boxes= 27  term=term_5
+
+--- Round 4/10 | seed=377030245 ---
+floor_building            util=0.688640  n_boxes= 26  term=term_5
+empty_maximal_space       util=0.657920  n_boxes= 25  term=term_5
+best_fit                  util=0.270080  n_boxes= 10  term=unstable
+
+--- Round 5/10 | seed=1419736561 ---
+floor_building            util=0.595200  n_boxes= 22  term=term_5
+empty_maximal_space       util=0.753280  n_boxes= 25  term=term_5
+best_fit                  util=0.793600  n_boxes= 27  term=term_5
+
+--- Round 6/10 | seed=1758346025 ---
+floor_building            util=0.599680  n_boxes= 23  term=term_5
+empty_maximal_space       util=0.565760  n_boxes= 20  term=term_5
+best_fit                  util=0.647040  n_boxes= 23  term=term_5
+
+--- Round 7/10 | seed=1509815059 ---
+floor_building            util=0.623360  n_boxes= 23  term=term_5
+empty_maximal_space       util=0.683520  n_boxes= 24  term=term_5
+best_fit                  util=0.701440  n_boxes= 24  term=term_5
+
+--- Round 8/10 | seed=1514678151 ---
+floor_building            util=0.689920  n_boxes= 26  term=term_5
+empty_maximal_space       util=0.668160  n_boxes= 22  term=term_5
+best_fit                  util=0.713600  n_boxes= 26  term=term_5
+
+--- Round 9/10 | seed=830807100 ---
+floor_building            util=0.680320  n_boxes= 25  term=term_5
+empty_maximal_space       util=0.741120  n_boxes= 25  term=term_5
+best_fit                  util=0.700160  n_boxes= 24  term=term_5
+
+--- Round 10/10 | seed=1652592539 ---
+floor_building            util=0.607360  n_boxes= 23  term=term_5
+empty_maximal_space       util=0.519680  n_boxes= 18  term=term_5
+best_fit                  util=0.706560  n_boxes= 26  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[floor_building]
+  util:    mean=0.647616  var=0.001506
+  n_boxes: mean=24.300000  var=1.810000
+  term_counts: {'term_5': 10}
+
+[empty_maximal_space]
+  util:    mean=0.666240  var=0.006198
+  n_boxes: mean=22.900000  var=5.690000
+  term_counts: {'term_5': 10}
+
+[best_fit]
+  util:    mean=0.673216  var=0.019799
+  n_boxes: mean=23.700000  var=22.410000
+  term_counts: {'term_5': 9, 'unstable': 1}
+
+=== Seeds (one per round) ===
+1646850688, 2084452586, 1173561140, 377030245, 1419736561, 1758346025, 1509815059, 1514678151, 830807100, 1652592539

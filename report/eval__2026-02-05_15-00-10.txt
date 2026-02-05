@@ -1,0 +1,12 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-05_15-00-10
+Heuristics: largest_volume_lowest_z, floor_building, llm_based, empty_maximal_space, extreme_point
+Rounds: 10
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/10 | seed=474240597 ---
+largest_volume_lowest_z   util=0.122880  n_boxes=  3  term=unstable
+floor_building            util=0.645760  n_boxes= 23  term=term_5

@@ -8,22 +8,27 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 
 from env import BoxPlanningEnvWrapper, compute_utilization_volume
-from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
-from heuristics.floor_building import FloorBuilding
-from heuristics.llm_entry import LLMBasedHeuristic
-from heuristics.empty_maximal_spaces import EmptyMaximalSpace
-from heuristics.extreme_point import ExtremePoint
-
+# from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
+# from heuristics.floor_building import FloorBuilding
+# from heuristics.llm_entry import LLMBasedHeuristic
+# from heuristics.empty_maximal_spaces import EmptyMaximalSpace
+# from heuristics.extreme_point import ExtremePoint
+# from heuristics.best_fit import BestFit
+from heuristics.first_fit import FirstFit
+# from heuristics.corner_point import CornerPoint
 
 # ------------------------------------------------------------
 # Heuristic registry
 # ------------------------------------------------------------
 HEURISTIC_REGISTRY = {
-    "largest_volume_lowest_z": LargestVolumeLowestZ,
-    "floor_building": FloorBuilding,
-    "llm_based": LLMBasedHeuristic,
-    "empty_maximal_space": EmptyMaximalSpace,
-    "extreme_point": ExtremePoint,
+    # "largest_volume_lowest_z": LargestVolumeLowestZ,
+    # "floor_building": FloorBuilding,
+    # "llm_based": LLMBasedHeuristic,
+    # "empty_maximal_space": EmptyMaximalSpace,
+    # "extreme_point": ExtremePoint,
+    # "best_fit": BestFit,
+    "first_fit": FirstFit,
+    # "corner_point": CornerPoint,
 }
 
 

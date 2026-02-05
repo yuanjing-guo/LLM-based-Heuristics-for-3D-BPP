@@ -1,0 +1,64 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-05_15-43-37
+Heuristics: floor_building, empty_maximal_space, best_fit, first_fit
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=2113501118 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.444960  n_boxes= 33  term=unstable
+first_fit                 util=0.519520  n_boxes= 39  term=term_5
+
+--- Round 2/5 | seed=1436292147 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+--- Round 3/5 | seed=718087232 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+--- Round 4/5 | seed=248066996 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.269120  n_boxes= 21  term=unstable
+
+--- Round 5/5 | seed=1342767866 ---
+floor_building            util=0.536800  n_boxes= 40  term=success
+empty_maximal_space       util=0.536800  n_boxes= 40  term=success
+best_fit                  util=0.536800  n_boxes= 40  term=success
+first_fit                 util=0.536800  n_boxes= 40  term=success
+
+
+=== Summary (mean / variance over rounds) ===
+
+[floor_building]
+  util:    mean=0.536800  var=0.000000
+  n_boxes: mean=40.000000  var=0.000000
+  term_counts: {'success': 5}
+
+[empty_maximal_space]
+  util:    mean=0.536800  var=0.000000
+  n_boxes: mean=40.000000  var=0.000000
+  term_counts: {'success': 5}
+
+[best_fit]
+  util:    mean=0.518432  var=0.001350
+  n_boxes: mean=38.600000  var=7.840000
+  term_counts: {'success': 4, 'unstable': 1}
+
+[first_fit]
+  util:    mean=0.479808  var=0.011142
+  n_boxes: mean=36.000000  var=56.400000
+  term_counts: {'success': 3, 'term_5': 1, 'unstable': 1}
+
+=== Seeds (one per round) ===
+2113501118, 1436292147, 718087232, 248066996, 1342767866

@@ -43,6 +43,17 @@
         "physics_mode": "rigid",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "failed_one",
+      "file": "heuristics/llm_archives/failed_one.py",
+      "saved_at": "2026-02-05 00:03:51",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "rigid",
+        "physics_obs": "on"
+      }
     }
   ]
 }

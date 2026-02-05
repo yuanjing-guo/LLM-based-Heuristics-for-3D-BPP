@@ -36,7 +36,7 @@ Usage:
 Register a heuristic first, then do:  
 Run all heuristics for 10 rounds (max_steps=200 per round):
 ```
-python3 evaluate.py --heuristics all --rounds 10 --max_steps 200
+python3 evaluate.py --heuristics all --rounds 5 --max_steps 200
 ```
 Run only two heuristics:
 ```
@@ -148,14 +148,37 @@ python run.py --debug --debug_start 0 --seed 0 --soft
 ## 8. Experiment
 
 '''
-hand-crafted heuristics:
-first_fit
-best_fit
-corner_point
-extreme_point
-floor_building
-empty_maximal_spaces   #all these heuristics have taken buffer into consideration.
-'''
+hand-crafted heuristics:  
+first_fit  
+best_fit  
+corner_point  
+extreme_point  
+floor_building  
+empty_maximal_spaces     #all these heuristics have taken buffer into consideration.
+
 llm_based heuristics:
 todo...
-'''
+## 9. Experimental Setup
+Data 1:   
+type_dict = {
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 10, "material":lightwood},
+            2: {"size":(0.04, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 10, "material":lightwood},
+            3: {"size":(0.04, 0.04, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 10, "material":darkwood},
+            4: {"size":(0.04, 0.04, 0.04), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 10, "material":darkwood},
+        }    
+
+Data 2:   
+type_dict = {
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 10, "material":lightwood},
+            2: {"size":(0.035, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 10, "material":lightwood},
+            3: {"size":(0.035, 0.035, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 10, "material":darkwood},
+            4: {"size":(0.035, 0.035, 0.035), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 10, "material":darkwood},
+        }
+
+Data 3:   
+type_dict = {
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 10, "material":lightwood},
+            2: {"size":(0.025, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 10, "material":lightwood},
+            3: {"size":(0.025, 0.025, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 10, "material":darkwood},
+            4: {"size":(0.025, 0.025, 0.025), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 10, "material":darkwood},
+        }
