@@ -5,12 +5,12 @@ from heuristics.base import BaseHeuristic
 
 class ExtremePoint(BaseHeuristic):
     """
-    Online Extreme Point (EP) heuristic for 3D bin packing.
+    Online Extreme Point (EP) heuristic with First-Fit placement.
 
     - Single container (pallet)
     - Top-loading (items placed from +z direction)
-    - EPs extracted implicitly from heightmap corners
-    - Candidate = (x, y, z) points only (no EMS)
+    - EPs extracted implicitly from heightmap (same as original EP)
+    - Placement rule: FIRST feasible EP/box/rotation is accepted
     """
 
     name = "extreme_point"
@@ -19,7 +19,7 @@ class ExtremePoint(BaseHeuristic):
         super().__init__()
 
     # --------------------------------------------------
-    # Extreme Point extraction from heightmap
+    # Extreme Point extraction from heightmap (UNCHANGED)
     # --------------------------------------------------
     def extract_eps(self, pallet: np.ndarray):
         """
@@ -49,7 +49,7 @@ class ExtremePoint(BaseHeuristic):
         return eps
 
     # --------------------------------------------------
-    # Main heuristic
+    # Main heuristic: EP + First-Fit
     # --------------------------------------------------
     def __call__(self, obs: dict) -> np.ndarray:
         pallet = obs["pallet_obs_density"]
@@ -57,11 +57,8 @@ class ExtremePoint(BaseHeuristic):
 
         eps = self.extract_eps(pallet)
 
-        best_choice = None  # (slot, rot_id, x, y)
-        best_score = None
-
         # --------------------------------------------------
-        # Placement selection
+        # First-Fit placement over EPs
         # --------------------------------------------------
         for (x, y, z) in eps:
             for slot in range(Kb):
@@ -87,34 +84,17 @@ class ExtremePoint(BaseHeuristic):
                     ):
                         continue
 
-                    # ------------------------------
-                    # EP placement score (Best-Fit)
-                    # ------------------------------
-                    footprint_area = dx * dy
-                    height_penalty = z
-
-                    score = (footprint_area, -height_penalty)
-
-                    if best_score is None or score > best_score:
-                        best_score = score
-                        best_choice = (slot, rot_id, x, y)
-
-            # EP-style early stop (FFD-like)
-            if best_choice is not None:
-                break
+                    # --------------------------------
+                    # First-Fit: accept immediately
+                    # --------------------------------
+                    return self.encode_action_logits(
+                        box_slot=slot,
+                        rot_id=rot_id,
+                        x=x,
+                        y=y,
+                    )
 
         # --------------------------------------------------
         # Failure fallback
         # --------------------------------------------------
-        if best_choice is None:
-            # deterministic explicit failure
-            return self.encode_action_logits(0, 0, 0, 0)
-
-        slot, rot_id, x, y = best_choice
-
-        return self.encode_action_logits(
-            box_slot=slot,
-            rot_id=rot_id,
-            x=x,
-            y=y,
-        )
+        return self.encode_action_logits(0, 0, 0, 0)

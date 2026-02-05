@@ -5,12 +5,13 @@ from heuristics.base import BaseHeuristic
 
 class CornerPoint(BaseHeuristic):
     """
-    Online Corner Point heuristic for 3D bin packing.
+    Online Corner Point heuristic with First-Fit placement.
 
     - Single container
     - Top-loading (z direction)
     - Corner points derived from heightmap
-    - Candidate = (x, y, z) only
+    - Candidate = (x, y, z)
+    - Placement rule: FIRST feasible placement is accepted
     """
 
     name = "corner_point"
@@ -19,7 +20,7 @@ class CornerPoint(BaseHeuristic):
         super().__init__()
 
     # --------------------------------------------------
-    # Corner point extraction from heightmap
+    # Corner point extraction from heightmap (UNCHANGED)
     # --------------------------------------------------
     def extract_corner_points(self, pallet: np.ndarray):
         """
@@ -43,12 +44,12 @@ class CornerPoint(BaseHeuristic):
                 z = int(hmap[x, y])
                 cps.append((x, y, z))
 
-        # top-loading priority: lowest first
+        # top-loading priority: lowest z first, then x, then y
         cps.sort(key=lambda p: (p[2], p[0], p[1]))
         return cps
 
     # --------------------------------------------------
-    # Main heuristic
+    # Main heuristic: Corner Point + First-Fit
     # --------------------------------------------------
     def __call__(self, obs: dict) -> np.ndarray:
         pallet = obs["pallet_obs_density"]
@@ -56,11 +57,8 @@ class CornerPoint(BaseHeuristic):
 
         corner_points = self.extract_corner_points(pallet)
 
-        best_choice = None   # (slot, rot_id, x, y)
-        best_score = None
-
         # --------------------------------------------------
-        # Placement selection
+        # First-Fit placement
         # --------------------------------------------------
         for (x, y, z) in corner_points:
             for slot in range(Kb):
@@ -87,33 +85,16 @@ class CornerPoint(BaseHeuristic):
                         continue
 
                     # ------------------------------------------
-                    # Corner Point placement score
+                    # First-Fit: accept immediately
                     # ------------------------------------------
-                    # prefer larger footprint, lower height
-                    footprint = dx * dy
-                    height_penalty = z
-
-                    score = (footprint, -height_penalty)
-
-                    if best_score is None or score > best_score:
-                        best_score = score
-                        best_choice = (slot, rot_id, x, y)
-
-            # Corner-point-style early stop
-            if best_choice is not None:
-                break
+                    return self.encode_action_logits(
+                        box_slot=slot,
+                        rot_id=rot_id,
+                        x=x,
+                        y=y,
+                    )
 
         # --------------------------------------------------
         # Failure fallback
         # --------------------------------------------------
-        if best_choice is None:
-            return self.encode_action_logits(0, 0, 0, 0)
-
-        slot, rot_id, x, y = best_choice
-
-        return self.encode_action_logits(
-            box_slot=slot,
-            rot_id=rot_id,
-            x=x,
-            y=y,
-        )
+        return self.encode_action_logits(0, 0, 0, 0)

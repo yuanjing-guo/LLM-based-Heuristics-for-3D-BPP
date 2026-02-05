@@ -7,10 +7,8 @@ class BestFit(BaseHeuristic):
     """
     Best-Fit 3D packing heuristic (top-loading).
 
-    - Single container
-    - Items placed from +z direction
-    - Candidate positions derived from heightmap
-    - Placement rule: select the best feasible position
+    Identical candidate space to First-Fit (heightmap-based flat rectangles).
+    Only differs in placement selection via a physics-aware Best-Fit score.
     """
 
     name = "best_fit"
@@ -18,10 +16,22 @@ class BestFit(BaseHeuristic):
     def __init__(self):
         super().__init__()
 
+        # scoring weights (tuned for palletization + physics)
+        self.w_footprint = 1.0     # absolute footprint usage
+        self.w_platform = 0.3      # prefer larger platforms
+        self.w_height = -0.5       # penalize higher placement
+        self.w_shape = -0.05       # mild regularization
+
     # --------------------------------------------------
-    # Candidate position generation (same as First-Fit)
+    # Candidate position generation (IDENTICAL to First-Fit)
     # --------------------------------------------------
     def extract_candidates(self, pallet: np.ndarray):
+        """
+        Generate candidate placement positions from heightmap.
+
+        Each candidate:
+            (z, x, y, dx_max, dy_max)
+        """
         X, Y, H = pallet.shape
         candidates = []
 
@@ -46,12 +56,12 @@ class BestFit(BaseHeuristic):
                 if dx > 0 and dy > 0:
                     candidates.append((z, x, y, dx, dy))
 
-        # fixed spatial priority (same as First-Fit)
+        # same deterministic order as First-Fit
         candidates.sort(key=lambda c: (c[0], c[1], c[2]))
         return candidates
 
     # --------------------------------------------------
-    # Best-Fit placement
+    # Best-Fit placement (ONLY difference vs First-Fit)
     # --------------------------------------------------
     def __call__(self, obs: dict) -> np.ndarray:
         pallet = obs["pallet_obs_density"]
@@ -59,8 +69,8 @@ class BestFit(BaseHeuristic):
 
         candidates = self.extract_candidates(pallet)
 
-        best_choice = None
-        best_score = None  # larger is better (tuple comparison)
+        best_score = None
+        best_action = None
 
         for (z, x, y, dx_max, dy_max) in candidates:
             for slot in range(Kb):
@@ -84,29 +94,34 @@ class BestFit(BaseHeuristic):
                     ):
                         continue
 
-                    # ----------------------------------
-                    # Best-Fit scoring (local optimality)
-                    # ----------------------------------
-                    footprint_fill = (dx * dy) / (dx_max * dy_max)
-                    height_penalty = z
+                    # --------------------------------
+                    # Physics-aware Best-Fit score
+                    # --------------------------------
+                    footprint = dx * dy                  # absolute area used
+                    platform = dx_max * dy_max           # size of supporting surface
+                    height = z                           # placement height
+                    shape = abs(dx - dy)                 # mild regularization
 
-                    score = (footprint_fill, -height_penalty)
+                    score = (
+                        self.w_footprint * footprint +
+                        self.w_platform * platform +
+                        self.w_height * height +
+                        self.w_shape * shape
+                    )
 
                     if best_score is None or score > best_score:
                         best_score = score
-                        best_choice = (slot, rot_id, x, y)
+                        best_action = self.encode_action_logits(
+                            box_slot=slot,
+                            rot_id=rot_id,
+                            x=x,
+                            y=y,
+                        )
 
         # --------------------------------------------------
-        # Commit best placement
+        # Failure fallback
         # --------------------------------------------------
-        if best_choice is None:
-            return self.encode_action_logits(0, 0, 0, 0)
+        if best_action is not None:
+            return best_action
 
-        slot, rot_id, x, y = best_choice
-
-        return self.encode_action_logits(
-            box_slot=slot,
-            rot_id=rot_id,
-            x=x,
-            y=y,
-        )
+        return self.encode_action_logits(0, 0, 0, 0)
