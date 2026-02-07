@@ -48,6 +48,11 @@ class CornerPoint(BaseHeuristic):
         cps.sort(key=lambda p: (p[2], p[0], p[1]))
         return cps
 
+    @staticmethod
+    def _footprint_top(hmap: np.ndarray, x: int, y: int, dx: int, dy: int) -> int:
+        """Return max height within the footprint to avoid overlap."""
+        return int(hmap[x:x + dx, y:y + dy].max(initial=0))
+
     # --------------------------------------------------
     # Main heuristic: Corner Point + First-Fit
     # --------------------------------------------------
@@ -56,6 +61,13 @@ class CornerPoint(BaseHeuristic):
         Kb = self.N  # visible items (IPS)
 
         corner_points = self.extract_corner_points(pallet)
+
+        # heightmap reused for footprint max check
+        occ = pallet > 0
+        has = occ.any(axis=2)
+        occ_rev = occ[..., ::-1]
+        first_from_top = occ_rev.argmax(axis=2)
+        hmap = np.where(has, pallet.shape[2] - first_from_top, 0)
 
         # --------------------------------------------------
         # First-Fit placement
@@ -75,12 +87,19 @@ class CornerPoint(BaseHeuristic):
                     if x + dx > pallet.shape[0] or y + dy > pallet.shape[1]:
                         continue
 
+                    # place flush with the tallest column in the footprint
+                    z_adj = self._footprint_top(hmap, x, y, dx, dy)
+
+                    # empty volume check to avoid overlap
+                    if np.any(pallet[x:x + dx, y:y + dy, z_adj:z_adj + dz] > 0):
+                        continue
+
                     # feasibility check (overlap + support)
                     if not self.feasibility.is_feasible(
                         pallet_obs=pallet,
                         x=x, y=y,
                         dx=dx, dy=dy, dz=dz,
-                        z=z,
+                        z=z_adj,
                     ):
                         continue
 

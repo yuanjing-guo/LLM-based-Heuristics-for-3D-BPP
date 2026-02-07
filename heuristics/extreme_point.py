@@ -57,10 +57,20 @@ class ExtremePoint(BaseHeuristic):
 
         eps = self.extract_eps(pallet)
 
+        # heightmap reused for footprint max check
+        occ = pallet > 0
+        has = occ.any(axis=2)
+        occ_rev = occ[..., ::-1]
+        first_from_top = occ_rev.argmax(axis=2)
+        hmap = np.where(has, pallet.shape[2] - first_from_top, 0)
+
         # --------------------------------------------------
-        # First-Fit placement over EPs
+        # Best-Fit style search over EPs (soft scoring)
         # --------------------------------------------------
-        for (x, y, z) in eps:
+        best_score = None
+        best_choice = None  # (slot, rot_id, x, y, z_adj)
+
+        for (x, y, _z_ignored) in eps:
             for slot in range(Kb):
                 if self.slot_is_empty(obs, slot):
                     continue
@@ -75,26 +85,50 @@ class ExtremePoint(BaseHeuristic):
                     if x + dx > pallet.shape[0] or y + dy > pallet.shape[1]:
                         continue
 
+                    # align to highest column within footprint to avoid overlap
+                    footprint = hmap[x:x + dx, y:y + dy]
+                    z_adj = int(footprint.max(initial=0))
+
+                    # volume must be empty
+                    if np.any(pallet[x:x + dx, y:y + dy, z_adj:z_adj + dz] > 0):
+                        continue
+
                     # feasibility (overlap + gravity consistency)
                     if not self.feasibility.is_feasible(
                         pallet_obs=pallet,
                         x=x, y=y,
                         dx=dx, dy=dy, dz=dz,
-                        z=z,
+                        z=z_adj,
                     ):
                         continue
 
-                    # --------------------------------
-                    # First-Fit: accept immediately
-                    # --------------------------------
-                    return self.encode_action_logits(
-                        box_slot=slot,
-                        rot_id=rot_id,
-                        x=x,
-                        y=y,
-                    )
+                    # ----------------------------
+                    # Soft best-fit score
+                    #   lower z      (primary)
+                    #   lower added height over avg footprint
+                    #   flatter footprint
+                    #   smaller x+y as gentle tie-break
+                    # ----------------------------
+                    new_top = z_adj + dz
+                    avg_h = float(footprint.mean()) if footprint.size else 0.0
+                    height_gain = new_top - avg_h
+                    flatness = float(footprint.ptp()) if footprint.size else 0.0
+                    score = (z_adj, height_gain, flatness, x + y)
+
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_choice = (slot, rot_id, x, y, z_adj)
 
         # --------------------------------------------------
-        # Failure fallback
+        # Return best found or fallback
         # --------------------------------------------------
-        return self.encode_action_logits(0, 0, 0, 0)
+        if best_choice is None:
+            return self.encode_action_logits(0, 0, 0, 0)
+
+        slot, rot_id, x, y, z_adj = best_choice
+        return self.encode_action_logits(
+            box_slot=slot,
+            rot_id=rot_id,
+            x=x,
+            y=y,
+        )
