@@ -156,8 +156,12 @@ extreme_point
 floor_building  
 empty_maximal_spaces     #all these heuristics have taken buffer into consideration.
 
-llm_based heuristics:
-todo...
+llm_based heuristics:  
+experiment-1: before_training and worker_guidance (very simple)  
+experiment-2: worker_guidance and expert_guidance  
+experiment-3: before_training -- expert_guidance -- expert_guidance_2 -- expert_guidance-3（There is an obvious trend of util that improves after first or second feedback but falls with the increasing iteration)  
+experiment-4: soft awareness...
+
 ## 9. Experimental Setup
 Data 1:   
 type_dict = {
