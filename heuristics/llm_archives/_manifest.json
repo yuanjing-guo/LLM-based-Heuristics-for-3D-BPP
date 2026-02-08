@@ -43,6 +43,83 @@
         "physics_mode": "soft",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "worker_stop_repeating",
+      "file": "heuristics/llm_archives/worker_stop_repeating.py",
+      "saved_at": "2026-02-08 21:25:09",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "before_training",
+      "file": "heuristics/llm_archives/before_training.py",
+      "saved_at": "2026-02-08 21:27:10",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "worker_failed",
+      "file": "heuristics/llm_archives/worker_failed.py",
+      "saved_at": "2026-02-08 21:36:28",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "worker_failed_1",
+      "file": "heuristics/llm_archives/worker_failed_1.py",
+      "saved_at": "2026-02-08 21:42:44",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "worker_failed_2",
+      "file": "heuristics/llm_archives/worker_failed_2.py",
+      "saved_at": "2026-02-08 21:48:24",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "worker_failed_3",
+      "file": "heuristics/llm_archives/worker_failed_3.py",
+      "saved_at": "2026-02-08 21:57:45",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "expert_failed",
+      "file": "heuristics/llm_archives/expert_failed.py",
+      "saved_at": "2026-02-08 22:54:25",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
     }
   ]
 }

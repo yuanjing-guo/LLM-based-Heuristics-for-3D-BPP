@@ -1,5 +1,5 @@
 # core/runner.py
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from envs.mixed_env import MixedBoxPlanningEnvWrapper
 
@@ -13,7 +13,7 @@ def run_episode(
     expose_physics_obs: bool = True,
     video_dir: str = "video",
     run_context_meta: Optional[Dict[str, Any]] = None,   # NEW
-) -> float:
+) -> Tuple[float, int, str]:
     physics_mode = "soft" if soft else "rigid"
 
     video_path: Optional[str] = None
@@ -42,7 +42,7 @@ def run_episode(
         )
         ctx["llm_policy_interface"] = meta["llm_policy_interface"]
         ctx["supports_remove_action"] = bool(meta["supports_remove_action"])
-        write_latest_run_context(ctx)
+        outp = write_latest_run_context(ctx)
         print(f"[Context] wrote: {outp}")
     except Exception as e:
         print(f"[Context] write failed: {e}")
@@ -55,12 +55,27 @@ def run_episode(
     step = 0
     done = False
     last_util = 0.0
+    last_info: Dict[str, Any] = {}
+    last_status = "running"
+    boxes_on_pallet = 0
 
     while (not done) and (step < max_steps):
         action = heuristic(obs)
         obs, reward, done, trunc, info = env.step(action)
         step += 1
-        last_util = float(info.get("util", info.get("util_current", 0.0)))
+
+        info = info or {}
+        last_info = info
+        last_util = float(info.get("util", info.get("util_current", last_util)))
+        boxes_on_pallet = int(info.get("pallet_count", boxes_on_pallet))
+
+        term = str(info.get("termination_reason", ""))
+        if trunc:
+            last_status = term or "truncated"
+        elif done:
+            last_status = term or "done"
+        else:
+            last_status = term or "running"
 
         # close video
     if hasattr(env.env, "writer") and env.env.writer is not None:
@@ -78,7 +93,13 @@ def run_episode(
 
     del env
 
-    return float(last_util)
+    if (not done) and step >= max_steps:
+        last_status = last_status if last_status != "running" else "max_steps"
+
+    if not last_status:
+        last_status = "unknown"
+
+    return float(last_util), int(boxes_on_pallet), str(last_status)
 
 
 def format_run_banner(

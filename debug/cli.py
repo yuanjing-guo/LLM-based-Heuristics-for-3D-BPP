@@ -88,7 +88,7 @@ def run_debug_loop(args, registry: Dict[str, Type], handcrafted_registry: Dict[s
                     no_video=args.no_video,
                 )
             )
-            util = run_episode(
+            util, n_boxes, term = run_episode(
                 heuristic,
                 max_steps=args.max_steps,
                 seed=args.seed,
@@ -97,7 +97,7 @@ def run_debug_loop(args, registry: Dict[str, Type], handcrafted_registry: Dict[s
                 expose_physics_obs=(not args.no_physics_obs),
                 video_dir="video",
             )
-            print(f"[Result] util={util:.4f}")
+            print(f"[Result] util={util:.4f} status={term} boxes={n_boxes}")
             continue
 
         if cmd == "gen":

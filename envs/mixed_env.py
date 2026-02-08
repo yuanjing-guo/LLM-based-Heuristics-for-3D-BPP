@@ -821,7 +821,11 @@ class MixedBoxPlanning(SingleArmEnv):
 
             info = _attach_util_current(info)
 
-            print(f"[Step] op=REMOVE idx={idx} ok={int(ok)}")
+            # Log remove with step index
+            print(
+                f"[Step] #{self.step_count} op=REMOVE idx={idx} ok={int(ok)} "
+                f"util={info.get('util_current', 0.0):.4f} pallets={info.get('pallet_count', 0)}"
+            )
             done = False
             return self.obs, reward, done, info
 
@@ -879,7 +883,13 @@ class MixedBoxPlanning(SingleArmEnv):
             )
             return self.obs, reward, done, info
 
-        print(f"[Step] op=PLACE slot={slot} rot_id={rot_id} place=(x={int(x2)}, y={int(y2)}, z={int(z2)})")
+        mass_kg = float(box_density) * float(dx * dy * dz) * (self.bin_size ** 3)
+        hardness = 1.0 / max(box_softness, 1e-8)
+        print(
+            f"[Step] #{self.step_count} op=PLACE slot={slot} rot_id={rot_id} "
+            f"place=(x={int(x2)}, y={int(y2)}, z={int(z2)}) "
+            f"density={box_density:.3f} softness={box_softness:.3f} hardness={hardness:.3f} mass={mass_kg:.3f}kg"
+        )
 
         self.place_box(box_obj, target_pos, target_quat)
 

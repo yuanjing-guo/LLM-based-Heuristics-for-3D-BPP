@@ -101,7 +101,7 @@ if __name__ == "__main__":
             )
         )
 
-        util = run_episode(
+        util, n_boxes, term = run_episode(
             heuristic,
             max_steps=args.max_steps,
             seed=args.seed,
@@ -116,4 +116,4 @@ if __name__ == "__main__":
             "expose_physics_obs": (not args.no_physics_obs),
             },
         )
-        print(f"[Result] util={util:.4f}")
+        print(f"[Result] util={util:.4f} status={term} boxes={n_boxes}")
