@@ -1,3 +1,6 @@
+'''
+gen keep stable while maximal the util
+'''
 import numpy as np
 from heuristics.base import BaseHeuristic
 
