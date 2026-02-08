@@ -156,11 +156,16 @@ extreme_point
 floor_building  
 empty_maximal_spaces     #all these heuristics have taken buffer into consideration.
 
-llm_based heuristics:  
+llm_based heuristics: 
+rigid:   
 experiment-1: before_training and worker_guidance (very simple)  
 experiment-2: worker_guidance and expert_guidance  
-experiment-3: before_training -- expert_guidance -- expert_guidance_2 -- expert_guidance-3（There is an obvious trend of util that improves after first or second feedback but falls with the increasing iteration)  
-experiment-4: soft awareness...
+experiment-3: before_training -- expert_guidance -- expert_guidance_2 -- expert_guidance_3（There is an obvious trend of util that improves after first or second feedback but falls with the increasing iteration)    
+
+soft:  
+experiment-4: give the feedbacks in 'worker_guidance_simple_soft' in order and an obvious improves can be seen.  
+experiment-5: compare before_training_soft and worker_guidance_specific_soft and worker_guidance_simple_soft
+experiment-6: 
 
 ## 9. Experimental Setup
 Data 1:   

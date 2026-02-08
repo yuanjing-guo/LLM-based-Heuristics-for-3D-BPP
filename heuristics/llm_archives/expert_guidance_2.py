@@ -2,11 +2,7 @@
 code length: 3026
 reason=height_oob util=0.8074 n_boxes=30
 expert feedback：
-Further improve space utilization by reducing small residual gaps. 
-In addition to footprint fill and height penalty, add a mild penalty 
-for creating thin slivers of free space (narrow gaps) that are smaller 
-than typical box footprints. Prefer placements that leave more 
-‘regular’ rectangular remaining areas.
+Further improve space utilization by reducing small residual gaps. In addition to footprint fill and height penalty, add a mild penalty for creating thin slivers of free space (narrow gaps) that are smaller than typical box footprints. Prefer placements that leave more ‘regular’ rectangular remaining areas.
 '''
 import numpy as np
 from heuristics.base import BaseHeuristic

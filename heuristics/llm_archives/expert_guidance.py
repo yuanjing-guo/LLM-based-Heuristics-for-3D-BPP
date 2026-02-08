@@ -2,11 +2,7 @@
 code length: 1957
 reason=height_oob util=0.7930 n_boxes=29
 expert feedback：
-Use heightmap-based corner points as 
-candidate positions. Evaluate all feasible placements 
-and select the one that maximizes footprint fill ratio 
-while penalizing higher placement heights. Prioritize 
-completing lower layers before stacking upward.
+Use heightmap-based corner points as candidate positions. Evaluate all feasible placements and select the one that maximizes footprint fill ratio while penalizing higher placement heights. Prioritize completing lower layers before stacking upward.
 '''
 import numpy as np
 from heuristics.base import BaseHeuristic

@@ -1,12 +1,8 @@
 '''
 code length: 3597
 reason=height_oob util=0.6758 n_boxes=27
-expert feedback：To further maximize space utilization, emphasize 
-maintaining a smoother and more uniform top surface.Prioritize 
-placements that minimize local height differences and reduce surface 
-roughness, even if this slightly reduces immediate footprint fill, 
-as a flatter surface is expected to enable denser packing in 
-subsequent steps.
+expert feedback：
+To further maximize space utilization, emphasize maintaining a smoother and more uniform top surface.Prioritize placements that minimize local height differences and reduce surface roughness, even if this slightly reduces immediate footprint fill, as a flatter surface is expected to enable denser packing in subsequent steps.
 '''
 import numpy as np
 from heuristics.base import BaseHeuristic

@@ -208,6 +208,9 @@ class BoxPlanning(SingleArmEnv):
         self.early_stop_on_unstable = True
         self.early_stop_check_every = 1  # check stability every N sim steps
 
+        # Step counter for clearer logging
+        self.step_counter = 0
+
         # --- Init box pose source (optional) ---
         self.init_box_pose_path = init_box_pose_path
 
@@ -583,6 +586,8 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def reinit(self, rng: np.random.Generator) -> Dict:
+        # Reset step numbering each episode
+        self.step_counter = 0
         self._reset_boxes_to_init_pose_if_available()
 
         self.unplaced_box_ids = copy.copy(self.boxes_ids)
@@ -617,6 +622,10 @@ class BoxPlanning(SingleArmEnv):
     # ---------------------------
 
     def step(self, action: np.ndarray):
+        # Increment step id for logging clarity (counts attempted placements)
+        self.step_counter += 1
+        step_id = self.step_counter
+
         box_slot = self.choose_box_slot(action)
         rot_id = self.choose_rot_id(action)
 
@@ -633,6 +642,10 @@ class BoxPlanning(SingleArmEnv):
         box_size = (np.array(box_obj.size, dtype=np.float32) * 2.0 / self.bin_size).astype(int)
         box_density = float(self.id_to_properties[box_id][3])  # density/1000
         box_softness = float(self.id_to_softness.get(box_id, 0.0))
+
+        # Compute physical weight (kg): density[kg/m^3] * volume[m^3]
+        full_size_m = np.array(box_obj.size, dtype=np.float32) * 2.0
+        box_weight_kg = float(np.prod(full_size_m) * (box_density * 1000.0))
 
         order = ORDERS[int(np.clip(rot_id, 0, 5))]
         target_quat = quat_xyzw_from_order(rot_id)
@@ -659,13 +672,23 @@ class BoxPlanning(SingleArmEnv):
             }
             info["box_density"] = float(box_density)
             info["box_softness"] = float(box_softness)
+            info["box_weight_kg"] = float(box_weight_kg)
 
             final_util = float(info.get("util", 0.0))
             n_boxes = int(len(self.boxes_on_pallet_id))
+            print(
+                f"[Step {step_id}] slot={int(box_slot)} rot_id={int(rot_id)} "
+                f"place=(x={int(e.x)}, y={int(e.y)}, z={int(e.z)}) "
+                f"softness={box_softness:.2f} weight={box_weight_kg:.3f}kg -> height_oob"
+            )
             print(f"[EpisodeEnd] reason=height_oob util={final_util:.4f} n_boxes={n_boxes}")
             return self.obs, reward, done, info
 
-        print(f"[Step] slot={int(box_slot)} rot_id={int(rot_id)} place=(x={int(x)}, y={int(y)}, z={int(z)})")
+        print(
+            f"[Step {step_id}] slot={int(box_slot)} rot_id={int(rot_id)} "
+            f"place=(x={int(x)}, y={int(y)}, z={int(z)}) "
+            f"softness={box_softness:.2f} weight={box_weight_kg:.3f}kg"
+        )
 
         self.place_box(box_obj, target_pos, target_quat)
 
@@ -696,6 +719,7 @@ class BoxPlanning(SingleArmEnv):
             }
             info["box_density"] = float(box_density)
             info["box_softness"] = float(box_softness)
+            info["box_weight_kg"] = float(box_weight_kg)
 
             final_util = float(info.get("util", 0.0))
             n_boxes = int(len(self.boxes_on_pallet_id))
@@ -733,6 +757,7 @@ class BoxPlanning(SingleArmEnv):
         }
         info["box_density"] = float(box_density)
         info["box_softness"] = float(box_softness)
+        info["box_weight_kg"] = float(box_weight_kg)
 
         if term_reason == 3:
             final_util = float(info.get("util", 0.0))
