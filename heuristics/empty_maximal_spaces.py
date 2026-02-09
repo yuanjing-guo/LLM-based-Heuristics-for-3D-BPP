@@ -3,7 +3,7 @@ import numpy as np
 from heuristics.base import BaseHeuristic
 
 
-class EMSOnline(BaseHeuristic):
+class EmptyMaximalSpace(BaseHeuristic):
     """
     Online EMS-style 3D packing heuristic.
 

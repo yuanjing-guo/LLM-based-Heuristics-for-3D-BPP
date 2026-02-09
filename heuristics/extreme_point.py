@@ -3,7 +3,7 @@ import numpy as np
 from heuristics.base import BaseHeuristic
 
 
-class ExtremePointPhysicsAware(BaseHeuristic):
+class ExtremePoint(BaseHeuristic):
     """
     Physics-aware Extreme Point heuristic.
 
@@ -16,7 +16,7 @@ class ExtremePointPhysicsAware(BaseHeuristic):
       (z, x + y, -support_ratio)
     """
 
-    name = "extreme_point_physics"
+    name = "extreme_point"
 
     def __init__(self):
         super().__init__()
