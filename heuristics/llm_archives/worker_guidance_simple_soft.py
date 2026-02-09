@@ -1,6 +1,7 @@
 '''
-gen keep stable while maximal the util
+gen consider the softness and keep stable, while maximize the space util.
 '''
+
 import numpy as np
 from heuristics.base import BaseHeuristic
 
@@ -8,12 +9,15 @@ def llm_policy(heur, obs):
     # Determine number of visible slots
     n_slots = int(obs['buffer'].size // heur.n_properties)
     
-    # Get pallet density array
+    # Get pallet density observation
     pallet = obs['pallet_obs_density']
     
-    # Track best action for maximal utility (stability prioritized)
-    best_action = (0, 0, 0, 0)
-    best_score = -1.0
+    # Check if physics-aware fields are available
+    has_physics = 'pallet_obs_softness' in obs and 'buffer_physics' in obs
+    
+    # Initialize best action tracking
+    best_action = None
+    best_score = -float('inf')
     
     # Scan slots
     for slot_i in range(n_slots):
@@ -31,14 +35,14 @@ def llm_policy(heur, obs):
             rotated_size = heur.rotate_size_bins(size_bins, rot_id)
             dx, dy, dz = rotated_size
             
-            # Skip if box dimensions exceed pallet bounds
+            # Skip if box doesn't fit within pallet dimensions
             if dx > heur.X or dy > heur.Y or dz > heur.H:
                 continue
             
             # Scan x,y positions
             for x in range(heur.X - dx + 1):
                 for y in range(heur.Y - dy + 1):
-                    # Check within pallet bounds
+                    # Check if placement is within pallet bounds
                     if not heur.feasibility.is_within_pallet(x, y, dx, dy):
                         continue
                     
@@ -55,22 +59,45 @@ def llm_policy(heur, obs):
                     if z + dz > heur.H:
                         continue
                     
-                    # Final feasibility check
+                    # Check feasibility
                     if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
-                        # Stability score: lower z is more stable
-                        stability_score = 1.0 / (z + 1.0)
+                        # Calculate score for this placement
+                        score = 0.0
                         
-                        # Utility score: maximize volume utilization
-                        volume_util = (dx * dy * dz) / (heur.X * heur.Y * heur.H)
+                        # 1. Maximize space utilization (prefer higher z placements)
+                        score += z * 0.1
                         
-                        # Combined score: stability first, then utility
-                        combined_score = stability_score + 0.1 * volume_util
+                        # 2. Consider softness if physics data is available
+                        if has_physics:
+                            softness = obs['pallet_obs_softness']
+                            # Check softness in the placement area
+                            if z > 0:
+                                # Look at the layer below the placement
+                                below_layer = softness[x:x+dx, y:y+dy, z-1]
+                                avg_softness = np.mean(below_layer)
+                                # Prefer placements on softer surfaces for stability
+                                score += avg_softness * 0.05
                         
-                        if combined_score > best_score:
-                            best_score = combined_score
+                        # 3. Prefer placements that fill empty spaces
+                        # Check how much empty space this placement covers
+                        empty_space = np.sum(pallet[x:x+dx, y:y+dy, z:z+dz] == 0)
+                        score += empty_space * 0.01
+                        
+                        # 4. Prefer placements closer to edges for better stability
+                        edge_distance = min(x, heur.X - (x + dx), y, heur.Y - (y + dy))
+                        score -= edge_distance * 0.005
+                        
+                        # Update best action if this score is better
+                        if score > best_score:
+                            best_score = score
                             best_action = (slot_i, rot_id, x, y)
     
-    return best_action
+    # Return best action if found, otherwise default
+    if best_action is not None:
+        return best_action
+    
+    # No feasible action found
+    return (0, 0, 0, 0)
 
 class WorkerGuidanceSimpleSoft(BaseHeuristic):
     name = "worker_guidance_simple_soft"

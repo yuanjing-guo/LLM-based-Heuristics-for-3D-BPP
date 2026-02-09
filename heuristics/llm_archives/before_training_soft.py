@@ -5,10 +5,7 @@ def llm_policy(heur, obs):
     # Determine number of visible slots
     n_slots = int(obs['buffer'].size // heur.n_properties)
     
-    # Get pallet density observation
-    pallet = obs['pallet_obs_density']
-    
-    # Scan slots
+    # Main loop over slots
     for slot_i in range(n_slots):
         if heur.slot_is_empty(obs, slot_i):
             continue
@@ -16,27 +13,27 @@ def llm_policy(heur, obs):
         props = heur.get_slot_props(obs, slot_i)
         size_bins = heur.props_to_size_bins(props)
         
-        # Skip invalid size bins
         if size_bins.size == 0 or np.any(size_bins <= 0):
             continue
         
-        # Scan rotations
+        # Try all rotations
         for rot_id in range(6):
             rotated_size = heur.rotate_size_bins(size_bins, rot_id)
-            dx, dy, dz = rotated_size[0], rotated_size[1], rotated_size[2]
+            dx, dy, dz = rotated_size
             
-            # Skip if dimensions exceed pallet bounds
+            # Check if rotation makes box too large for pallet
             if dx > heur.X or dy > heur.Y or dz > heur.H:
                 continue
             
-            # Scan x, y positions
+            # Scan x,y positions
             for x in range(heur.X - dx + 1):
                 for y in range(heur.Y - dy + 1):
-                    # Check within pallet bounds
+                    # Check within pallet bounds (redundant but safe)
                     if not heur.feasibility.is_within_pallet(x, y, dx, dy):
                         continue
                     
                     # Compute z exactly as in env.py
+                    pallet = obs['pallet_obs_density']
                     place_area = pallet[x:x+dx, y:y+dy, :]
                     non_zero = np.any(place_area > 0, axis=(0, 1))
                     
@@ -49,7 +46,7 @@ def llm_policy(heur, obs):
                     if z + dz > heur.H:
                         continue
                     
-                    # Check feasibility
+                    # Final feasibility check
                     if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
                         return (slot_i, rot_id, x, y)
     
