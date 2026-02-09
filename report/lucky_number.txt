@@ -1,0 +1,25 @@
+palletization) bern@bern-virtual-machine:~/KIT/hot ai/LLM-based-Heuristics-for-3D-BPP$ python3 run.py --heuristic expert_guidance_soft --seed 12135546543 --soft
+[robosuite WARNING] No private macro file found! (macros.py:53)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:54)
+[robosuite WARNING] To setup, run: python /home/bern/anaconda3/envs/palletization/lib/python3.8/site-packages/robosuite/scripts/setup_macros.py (macros.py:55)
+[Run] Heuristic=expert_guidance_soft | seed=12135546543 | max_steps=200 | physics_mode=soft | physics_obs=on | video=on
+[Video] Saving to: video/expert_guidance_soft__soft__2026-02-09_19-13-56.mp4
+[Context] wrote: runs/latest/run_context.json
+[Step 1] slot=0 rot_id=0 place=(x=0, y=0, z=0) softness=0.20 weight=1.920kg
+[Step 2] slot=0 rot_id=0 place=(x=0, y=0, z=6) softness=0.20 weight=0.144kg
+[Step 3] slot=0 rot_id=0 place=(x=0, y=8, z=0) softness=0.20 weight=1.920kg
+[Step 4] slot=0 rot_id=0 place=(x=0, y=6, z=6) softness=1.80 weight=0.108kg
+[Step 5] slot=0 rot_id=1 place=(x=0, y=0, z=12) softness=0.20 weight=1.920kg
+[Step 6] slot=0 rot_id=0 place=(x=0, y=16, z=0) softness=1.80 weight=2.560kg
+[Step 7] slot=0 rot_id=0 place=(x=0, y=16, z=8) softness=0.20 weight=1.920kg
+[Step 8] slot=0 rot_id=0 place=(x=0, y=6, z=12) softness=1.80 weight=0.108kg
+[Step 9] slot=0 rot_id=0 place=(x=8, y=0, z=0) softness=1.80 weight=2.560kg
+[Step 10] slot=0 rot_id=0 place=(x=8, y=0, z=8) softness=1.80 weight=2.560kg
+[Step 11] slot=0 rot_id=0 place=(x=0, y=16, z=14) softness=0.20 weight=0.144kg
+[Step 12] slot=0 rot_id=0 place=(x=8, y=8, z=0) softness=1.80 weight=0.108kg
+[Step 13] slot=0 rot_id=1 place=(x=6, y=8, z=6) softness=0.20 weight=1.920kg
+[Step 14] slot=0 rot_id=0 place=(x=6, y=8, z=14) softness=0.20 weight=0.144kg
+[Step 15] slot=0 rot_id=0 place=(x=8, y=14, z=0) softness=1.80 weight=0.108kg
+[Step 16] slot=0 rot_id=0 place=(x=14, y=8, z=0) softness=0.20 weight=0.144kg
+[EpisodeEnd] reason=unstable util=0.4147 n_boxes=15
+[Result] util=0.4147

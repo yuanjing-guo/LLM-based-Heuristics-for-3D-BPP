@@ -4,7 +4,7 @@
   "X": 25,
   "Y": 25,
   "H": 20,
-  "N_visible_boxes": 5,
+  "N_visible_boxes": 1,
   "bin_size": 0.01,
   "n_properties": 4,
   "n_physics_properties": 2,
@@ -56,12 +56,12 @@
     "4": "invalid_slot (box_slot >= remaining)",
     "5": "height_oob"
   },
-  "seed": 0,
+  "seed": 12135546543,
   "max_steps": 200,
   "arg_soft": true,
   "arg_expose_physics_obs": true,
   "task_config": {
-    "buffer_size": 5,
+    "buffer_size": 1,
     "bin_size": 0.01,
     "pallet": {
       "size": [
@@ -93,7 +93,7 @@
     },
     "buffer": {
       "shape": [
-        20
+        4
       ],
       "dtype": "float32"
     },
@@ -107,7 +107,7 @@
     },
     "buffer_physics": {
       "shape": [
-        10
+        2
       ],
       "dtype": "float32"
     }
