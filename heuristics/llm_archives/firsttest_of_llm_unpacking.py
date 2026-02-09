@@ -26,7 +26,7 @@ def llm_policy(heur, obs):
     best_score = -float('inf')
     
     for slot_i in range(n_slots):
-        if heur.slot_is_empty(obs, slot_i):
+        if heur.slot_is_empty(obs, sArchivedHeuristilot_i):
             continue
             
         # Get box properties

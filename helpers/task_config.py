@@ -19,10 +19,10 @@ class TaskConfig:
     class box:
         n_properties = 4
         type_dict = {
-            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 16, "material":lightwood},
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 5.0, "count": 16, "material":darkwood},
             2: {"size":(0.035, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 16, "material":lightwood},
-            3: {"size":(0.035, 0.035, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 16, "material":darkwood},
-            4: {"size":(0.035, 0.035, 0.035), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 16, "material":darkwood},
+            3: {"size":(0.035, 0.035, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 16, "material":lightwood},
+            4: {"size":(0.035, 0.035, 0.035), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 5.0, "count": 16, "material":darkwood},
         }
         # 48 * 10 + 64 * 10 + 27 * 5 + 48 * 10 + 64 * 10
         n_type = len(type_dict)
@@ -39,5 +39,5 @@ class TaskConfig:
         relative_table_displacement = (0, 0.4, 0.01)
         material=redwood
     
-    buffer_size = 5
+    buffer_size = 2
     bin_size = 0.01 # use 1cm as bin size to discrete the space

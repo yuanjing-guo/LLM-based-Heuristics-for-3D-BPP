@@ -1,10 +1,10 @@
 {
-  "physics_mode": "rigid",
+  "physics_mode": "soft",
   "expose_physics_obs": true,
   "X": 25,
   "Y": 25,
   "H": 20,
-  "N_visible_boxes": 5,
+  "N_visible_boxes": 2,
   "bin_size": 0.01,
   "n_properties": 4,
   "n_physics_properties": 2,
@@ -63,10 +63,10 @@
   },
   "seed": 0,
   "max_steps": 200,
-  "arg_soft": false,
+  "arg_soft": true,
   "arg_expose_physics_obs": true,
   "task_config": {
-    "buffer_size": 5,
+    "buffer_size": 2,
     "bin_size": 0.01,
     "pallet": {
       "size": [
@@ -98,7 +98,7 @@
     },
     "buffer": {
       "shape": [
-        20
+        8
       ],
       "dtype": "float32"
     },
@@ -112,7 +112,7 @@
     },
     "buffer_physics": {
       "shape": [
-        10
+        4
       ],
       "dtype": "float32"
     }
