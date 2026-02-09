@@ -120,6 +120,17 @@
         "physics_mode": "soft",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "i_love_llm",
+      "file": "heuristics/llm_archives/i_love_llm.py",
+      "saved_at": "2026-02-09 18:56:31",
+      "meta": {
+        "seed": 0,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
     }
   ]
 }
