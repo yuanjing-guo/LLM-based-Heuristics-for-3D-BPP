@@ -8,10 +8,24 @@ from heuristics.extreme_point import ExtremePoint
 from heuristics.corner_point import CornerPoint
 from heuristics.first_fit import FirstFit
 from heuristics.best_fit import BestFit
+
+from heuristics.llm_archives.before_training_soft import BeforeTrainingSoft  
+from heuristics.llm_archives.before_training import BeforeTraining  
+from heuristics.llm_archives.expert_guidance_2 import ExpertGuidance2  
+from heuristics.llm_archives.expert_guidance_3 import ExpertGuidance3
+from heuristics.llm_archives.expert_guidance import ExpertGuidance
+
+from heuristics.llm_archives.expert_guidance_soft import ExpertGuidanceSoft
+from heuristics.llm_archives.my_best_heuristic_no_physics import MyBestHeuristic
+from heuristics.llm_archives.worker_guidance_simple_soft import WorkerGuidanceSimpleSoft
+from heuristics.llm_archives.worker_guidance_specific_soft import WorkerGuidanceSpecificSoft
+from heuristics.llm_archives.worker_guidance import WorkerGuidance 
+
+
+
 from heuristics.llm_entry import LLMBasedHeuristic
 from heuristics.floor_building_buffer import FloorBuildingBuffer
 from heuristics.floor_building_buffer_rule_physics import FloorBuildingBufferRulePhysics
-
 from core.registry import build_registry
 from core.runner import run_episode, format_run_banner
 
@@ -30,6 +44,23 @@ HEURISTIC_REGISTRY = {
     "llm_based": LLMBasedHeuristic,
     "floor_building_buffer": FloorBuildingBuffer,
     "floor_building_buffer_rule_physics": FloorBuildingBufferRulePhysics,
+    "before_training_soft": BeforeTrainingSoft,
+    "before_training": BeforeTraining,
+    "expert_guidance2": ExpertGuidance2,
+    "expert_guidance3": ExpertGuidance3,
+    "expert_guidance": ExpertGuidance,
+    "expert_guidance_soft": ExpertGuidanceSoft,
+    "my_best_heuristic_no_physics": MyBestHeuristic,
+    "worker_guidance": WorkerGuidance,
+    "worker_guidance_simple_soft": WorkerGuidanceSimpleSoft,
+    "worker_guidance_specific_soft": WorkerGuidanceSpecificSoft,
+
+    
+ 
+
+
+    
+
 }
 
 

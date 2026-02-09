@@ -1,0 +1,74 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-09_18-02-13
+Heuristics: before_training, expert_guidance_2, expert_guidance_3, expert_guidance, worker_guidance
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=2056943846 ---
+before_training           util=0.530240  n_boxes= 20  term=term_5
+expert_guidance_2         util=0.773440  n_boxes= 28  term=term_5
+expert_guidance_3         util=0.664960  n_boxes= 26  term=term_5
+expert_guidance           util=0.759040  n_boxes= 27  term=term_5
+worker_guidance           util=0.064000  n_boxes=  2  term=unstable
+
+--- Round 2/5 | seed=538812510 ---
+before_training           util=0.159360  n_boxes=  7  term=unstable
+expert_guidance_2         util=0.709120  n_boxes= 28  term=term_5
+expert_guidance_3         util=0.735680  n_boxes= 28  term=term_5
+expert_guidance           util=0.706880  n_boxes= 26  term=term_5
+worker_guidance           util=0.744000  n_boxes= 29  term=term_5
+
+--- Round 3/5 | seed=819154443 ---
+before_training           util=0.762240  n_boxes= 26  term=term_5
+expert_guidance_2         util=0.753920  n_boxes= 25  term=term_5
+expert_guidance_3         util=0.781120  n_boxes= 27  term=term_5
+expert_guidance           util=0.764800  n_boxes= 27  term=term_5
+worker_guidance           util=0.733440  n_boxes= 24  term=term_5
+
+--- Round 4/5 | seed=971306201 ---
+before_training           util=0.674240  n_boxes= 25  term=term_5
+expert_guidance_2         util=0.768320  n_boxes= 27  term=term_5
+expert_guidance_3         util=0.367680  n_boxes= 11  term=unstable
+expert_guidance           util=0.768320  n_boxes= 27  term=term_5
+worker_guidance           util=0.678080  n_boxes= 23  term=term_5
+
+--- Round 5/5 | seed=1947063655 ---
+before_training           util=0.726400  n_boxes= 26  term=term_5
+expert_guidance_2         util=0.742720  n_boxes= 26  term=term_5
+expert_guidance_3         util=0.746880  n_boxes= 27  term=term_5
+expert_guidance           util=0.742720  n_boxes= 26  term=term_5
+worker_guidance           util=0.746240  n_boxes= 25  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[before_training]
+  util:    mean=0.570496  var=0.048498
+  n_boxes: mean=20.800000  var=52.560000
+  term_counts: {'term_5': 4, 'unstable': 1}
+
+[expert_guidance_2]
+  util:    mean=0.749504  var=0.000525
+  n_boxes: mean=26.800000  var=1.360000
+  term_counts: {'term_5': 5}
+
+[expert_guidance_3]
+  util:    mean=0.659264  var=0.022684
+  n_boxes: mean=23.800000  var=41.360000
+  term_counts: {'term_5': 4, 'unstable': 1}
+
+[expert_guidance]
+  util:    mean=0.748352  var=0.000507
+  n_boxes: mean=26.600000  var=0.240000
+  term_counts: {'term_5': 5}
+
+[worker_guidance]
+  util:    mean=0.593152  var=0.070617
+  n_boxes: mean=20.600000  var=90.640000
+  term_counts: {'term_5': 4, 'unstable': 1}
+
+=== Seeds (one per round) ===
+2056943846, 538812510, 819154443, 971306201, 1947063655

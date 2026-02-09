@@ -1,0 +1,17 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-09_17-41-51
+Heuristics: before_training_soft, expert_guidance_soft, worker_guidance_simple_soft, worker_guidance_specific_soft
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=1447290940 ---
+before_training_soft      util=0.623200  n_boxes= 48  term=term_5
+expert_guidance_soft      util=0.637760  n_boxes= 48  term=term_5
+worker_guidance_simple_soft  util=0.640320  n_boxes= 47  term=term_5
+worker_guidance_specific_soft  util=0.623200  n_boxes= 48  term=term_5
+
+--- Round 2/5 | seed=1452713723 ---
+before_training_soft      util=0.628560  n_boxes= 48  term=term_5

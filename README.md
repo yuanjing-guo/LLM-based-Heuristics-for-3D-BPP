@@ -42,6 +42,7 @@ Run only two heuristics:
 ```
 ```  
 Save videos for each round (this will be much slower and produce large files):
+
 ```
 python3 evaluate.py --heuristics all --rounds 5 --save_video
 ```
@@ -188,7 +189,7 @@ type_dict = {
 Data 3:   
 type_dict = {
             1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.9, "count": 10, "material":lightwood},
-            2: {"size":(0.025, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 10, "material":lightwood},
-            3: {"size":(0.025, 0.025, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 10, "material":darkwood},
+            2: {"size":(0.025, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 20, "material":lightwood},
+            3: {"size":(0.025, 0.025, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 20, "material":darkwood},
             4: {"size":(0.025, 0.025, 0.025), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.9, "count": 10, "material":darkwood},
         }

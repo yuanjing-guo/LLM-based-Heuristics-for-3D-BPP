@@ -1,0 +1,32 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-09_16-51-25
+Heuristics: floor_building, llm_based, empty_maximal_space, extreme_point, best_fit, first_fit, corner_point
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=330015213 ---
+floor_building            util=0.643040  n_boxes= 48  term=term_5
+llm_based                 util=0.643040  n_boxes= 48  term=term_5
+empty_maximal_space       util=0.736240  n_boxes= 55  term=term_5
+extreme_point             util=0.661120  n_boxes= 51  term=term_5
+best_fit                  util=0.732240  n_boxes= 55  term=term_5
+first_fit                 util=0.611040  n_boxes= 45  term=term_5
+corner_point              util=0.601040  n_boxes= 44  term=term_5
+
+--- Round 2/5 | seed=315316808 ---
+floor_building            util=0.642960  n_boxes= 49  term=term_5
+llm_based                 util=0.642960  n_boxes= 49  term=term_5
+empty_maximal_space       util=0.670160  n_boxes= 50  term=term_5
+extreme_point             util=0.665440  n_boxes= 52  term=term_5
+best_fit                  util=0.724560  n_boxes= 55  term=term_5
+first_fit                 util=0.594560  n_boxes= 45  term=term_5
+corner_point              util=0.560000  n_boxes= 43  term=term_5
+
+--- Round 3/5 | seed=1776287874 ---
+floor_building            util=0.638640  n_boxes= 48  term=term_5
+llm_based                 util=0.638640  n_boxes= 48  term=term_5
+empty_maximal_space       util=0.722400  n_boxes= 53  term=term_5
+extreme_point             util=0.610800  n_boxes= 47  term=term_5

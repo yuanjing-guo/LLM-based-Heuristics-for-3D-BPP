@@ -56,7 +56,7 @@ def llm_policy(heur, obs):
     # No feasible action found
     return (0, 0, 0, 0)
 
-class ArchivedHeuristic(BaseHeuristic):
+class BeforeTrainingSoft(BaseHeuristic):
     name = "before_training_soft"
 
     def __init__(self):

@@ -96,7 +96,7 @@ def llm_policy(heur, obs):
     # No feasible action found
     return (0, 0, 0, 0)
 
-class ArchivedHeuristic(BaseHeuristic):
+class ExpertGuidanceSoft(BaseHeuristic):
     name = "expert_guidance_soft"
 
     def __init__(self):

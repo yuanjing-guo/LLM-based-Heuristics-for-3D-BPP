@@ -270,7 +270,7 @@ def llm_policy(heur, obs):
     return best_action
 
 
-class ArchivedHeuristic(BaseHeuristic):
+class TestFailedOne(BaseHeuristic):
     name = "failed_one_fixed"
 
     def __init__(self):

@@ -57,7 +57,7 @@ def llm_policy(heur, obs):
     
     return (0, 0, 0, 0)
 
-class ArchivedHeuristic(BaseHeuristic):
+class Test(BaseHeuristic):
     name = "test"
 
     def __init__(self):

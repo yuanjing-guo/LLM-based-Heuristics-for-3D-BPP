@@ -144,7 +144,7 @@ def llm_policy(heur, obs):
     
     return (0, 0, 0, 0)
 
-class ArchivedHeuristic(BaseHeuristic):
+class WorkerGuidanceSpecificSoft(BaseHeuristic):
     name = "worker_guidance_specific_soft"
 
     def __init__(self):

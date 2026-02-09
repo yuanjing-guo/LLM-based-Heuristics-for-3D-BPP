@@ -46,7 +46,7 @@ def llm_policy(heur, obs):
 
     return best_action
 
-class ArchivedHeuristic(BaseHeuristic):
+class MyBestV1(BaseHeuristic):
     name = "my_best_v1"
 
     def __init__(self):

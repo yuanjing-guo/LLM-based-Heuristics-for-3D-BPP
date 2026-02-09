@@ -41,7 +41,7 @@ def llm_policy(heur, obs):
     
     return (0, 0, 0, 0)
 
-class ArchivedHeuristic(BaseHeuristic):
+class BeforeTraining(BaseHeuristic):
     name = "before_training"
 
     def __init__(self):

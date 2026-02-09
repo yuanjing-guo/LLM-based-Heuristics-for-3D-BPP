@@ -1,0 +1,64 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-09_17-35-24
+Heuristics: before_training_soft, expert_guidance_soft, worker_guidance_simple_soft, worker_guidance_specific_soft
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/5 | seed=711679931 ---
+before_training_soft      util=0.643040  n_boxes= 48  term=term_5
+expert_guidance_soft      util=0.653840  n_boxes= 48  term=term_5
+worker_guidance_simple_soft  util=0.663840  n_boxes= 49  term=term_5
+worker_guidance_specific_soft  util=0.708160  n_boxes= 54  term=term_5
+
+--- Round 2/5 | seed=1355755125 ---
+before_training_soft      util=0.616720  n_boxes= 46  term=term_5
+expert_guidance_soft      util=0.698000  n_boxes= 51  term=term_5
+worker_guidance_simple_soft  util=0.632800  n_boxes= 46  term=term_5
+worker_guidance_specific_soft  util=0.635840  n_boxes= 48  term=term_5
+
+--- Round 3/5 | seed=1527427755 ---
+before_training_soft      util=0.604560  n_boxes= 45  term=term_5
+expert_guidance_soft      util=0.661520  n_boxes= 48  term=term_5
+worker_guidance_simple_soft  util=0.673520  n_boxes= 49  term=term_5
+worker_guidance_specific_soft  util=0.667440  n_boxes= 50  term=term_5
+
+--- Round 4/5 | seed=70613613 ---
+before_training_soft      util=0.550560  n_boxes= 41  term=term_5
+expert_guidance_soft      util=0.654320  n_boxes= 48  term=term_5
+worker_guidance_simple_soft  util=0.666320  n_boxes= 49  term=term_5
+worker_guidance_specific_soft  util=0.598960  n_boxes= 45  term=term_5
+
+--- Round 5/5 | seed=348245346 ---
+before_training_soft      util=0.679360  n_boxes= 52  term=term_5
+expert_guidance_soft      util=0.682560  n_boxes= 51  term=term_5
+worker_guidance_simple_soft  util=0.627360  n_boxes= 47  term=term_5
+worker_guidance_specific_soft  util=0.679360  n_boxes= 52  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[before_training_soft]
+  util:    mean=0.618848  var=0.001824
+  n_boxes: mean=46.400000  var=13.040000
+  term_counts: {'term_5': 5}
+
+[expert_guidance_soft]
+  util:    mean=0.670048  var=0.000304
+  n_boxes: mean=49.200000  var=2.160000
+  term_counts: {'term_5': 5}
+
+[worker_guidance_simple_soft]
+  util:    mean=0.652768  var=0.000356
+  n_boxes: mean=48.000000  var=1.600000
+  term_counts: {'term_5': 5}
+
+[worker_guidance_specific_soft]
+  util:    mean=0.657952  var=0.001408
+  n_boxes: mean=49.800000  var=9.760000
+  term_counts: {'term_5': 5}
+
+=== Seeds (one per round) ===
+711679931, 1355755125, 1527427755, 70613613, 348245346

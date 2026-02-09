@@ -50,7 +50,7 @@ def llm_policy(heur, obs):
     
     return best_action
 
-class ArchivedHeuristic(BaseHeuristic):
+class WorkerGuidance(BaseHeuristic):
     name = "worker_guidance"
 
     def __init__(self):

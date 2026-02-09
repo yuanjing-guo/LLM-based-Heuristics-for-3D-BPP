@@ -1,0 +1,22 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-09_15-38-00
+Heuristics: extreme_point
+Rounds: 1
+Max steps per episode: 200
+Save video: True
+physics_mode: rigid
+physics_obs: on
+
+--- Round 1/1 | seed=44605239 ---
+extreme_point             util=0.597440  n_boxes= 28  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[extreme_point]
+  util:    mean=0.597440  var=0.000000
+  n_boxes: mean=28.000000  var=0.000000
+  term_counts: {'term_5': 1}
+
+=== Seeds (one per round) ===
+44605239
