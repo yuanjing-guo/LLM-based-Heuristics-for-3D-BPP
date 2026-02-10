@@ -1,113 +1,200 @@
 '''
-Use an EMS-based search to enumerate candidate positions, fill the bottom layer with flat hard boxes first, then place soft boxes only on upper layers using best-fit; if no hard-box EMS placement is feasible, fall back to the lowest feasible hard-box placement.
+FEEDBACK: Revise the policy with these strict infeasibility rules: (1) only allow horizontal placements at all layers,skip any rotation where the largest face is not parallel to the pallet; (2) when z==0, skip placements of soft boxes in buffer so only hard boxes may be placed on the bottom; if no hard box in buffer,then place soft boxes on a hard one.(3) when z>0, allow placement only on hard support at layer z−1 and skip placements that reuse the same (x,y) footprint and increase height.(5)refer to some handcrafted heuristic like ems to generate the space to place, maximize the space util
+
+observed problem:
+when threre is no hard box in buffer, the agent will not place soft 
+boxes in bottom layer and reuse the same (x,y) until oob, which leads
+to the flatuate of space util seen in the report 'expert_soft_test_record'.
+
+when it comes to worker guidance, the performance is worse, we tried many 
+expressions but all of them are not good, I can't ensure the iil will consider 
+the soft awareness just use simple and natural words. Only strong and specific 
+constrains like a expert will work.
 '''
+
 
 import numpy as np
 from heuristics.base import BaseHeuristic
 
 def llm_policy(heur, obs):
-    # Determine number of visible slots
     n_slots = int(obs['buffer'].size // heur.n_properties)
-    
-    # First pass: try to place hard boxes using EMS-based search
-    # We'll implement a simplified EMS by scanning all positions and finding empty spaces
-    # that can accommodate boxes at z=0 (bottom layer)
-    
-    # Collect hard boxes (we need to determine hardness from properties)
-    # In the given schema, we don't have direct hardness info, so we'll assume
-    # all boxes are hard for bottom layer placement attempt
     pallet = obs['pallet_obs_density']
     
-    # Try to find EMS placements for hard boxes at bottom layer
+    # Get softness info if available
+    physics_mode_soft = True  # from context
+    expose_physics = True  # from context
+    use_physics = physics_mode_soft and expose_physics
+    
+    # Get softness arrays if available
+    pallet_softness = None
+    buffer_physics = None
+    if use_physics:
+        if 'pallet_obs_softness' in obs:
+            pallet_softness = obs['pallet_obs_softness']
+        if 'buffer_physics' in obs:
+            buffer_physics = obs['buffer_physics']
+    
+    # Helper to check if box is hard
+    def is_hard_box(slot_idx):
+        if buffer_physics is not None and slot_idx < len(buffer_physics):
+            return buffer_physics[slot_idx] < 0.5  # Assuming 0=hard, 1=soft
+        # Fallback: check if we can determine from properties
+        props = heur.get_slot_props(obs, slot_idx)
+        # Property 3 might indicate softness (0=hard, 1=soft)
+        if len(props) > 3:
+            return props[3] < 0.5
+        return True  # Default to hard if unknown
+    
+    # Helper to check if support at (x,y,z-1) is hard
+    def has_hard_support(x, y, z, dx, dy):
+        if z == 0:
+            return True  # Ground support is always hard
+        if pallet_softness is None:
+            return True  # Can't check without softness info
+        
+        # Check the entire footprint at layer z-1
+        support_layer = pallet_softness[x:x+dx, y:y+dy, z-1]
+        # If any cell in the support area is soft (>=0.5), support is not fully hard
+        return not np.any(support_layer >= 0.5)
+    
+    # Helper to check if placement reuses same footprint and increases height
+    def reuses_footprint_and_increases_height(x, y, dx, dy, z):
+        if z == 0:
+            return False
+        # Check if there's already a box at (x,y,z) with same footprint
+        current_footprint = pallet[x:x+dx, y:y+dy, z]
+        return np.any(current_footprint > 0)
+    
+    # Simple EMS-like space generation: prioritize lower z, then lower x, then lower y
+    # We'll generate candidate positions in a "good" order
+    candidate_positions = []
+    for x in range(heur.X):
+        for y in range(heur.Y):
+            # Find current height at this (x,y)
+            column = pallet[x, y, :]
+            non_zero = np.where(column > 0)[0]
+            z = int(non_zero[-1] + 1) if non_zero.size > 0 else 0
+            candidate_positions.append((z, x, y))
+    
+    # Sort by z (lowest first), then x, then y
+    candidate_positions.sort(key=lambda pos: (pos[0], pos[1], pos[2]))
+    
     for slot_i in range(n_slots):
         if heur.slot_is_empty(obs, slot_i):
             continue
-        
         props = heur.get_slot_props(obs, slot_i)
         size_bins = heur.props_to_size_bins(props)
-        
         if size_bins.size == 0 or np.any(size_bins <= 0):
             continue
         
-        # Try all rotations
+        # Check if box is hard
+        box_is_hard = is_hard_box(slot_i)
+        
         for rot_id in range(6):
             rotated = heur.rotate_size_bins(size_bins, rot_id)
-            dx, dy, dz = rotated
+            dx, dy, dz = rotated[0], rotated[1], rotated[2]
             
-            if dx <= 0 or dy <= 0 or dz <= 0:
+            # Rule (1): Only allow horizontal placements (largest face parallel to pallet)
+            # This means dz should be the smallest dimension
+            sorted_dims = sorted([dx, dy, dz])
+            if dz != sorted_dims[0]:  # dz is not the smallest
                 continue
             
-            if not heur.feasibility.is_within_pallet(0, 0, dx, dy):
+            # Check if box fits in pallet
+            if dx > heur.X or dy > heur.Y or dz > heur.H:
                 continue
             
-            # EMS-based search: find positions where box can be placed at z=0
-            # with full support (no overhang)
+            # Try candidate positions from EMS-like heuristic
+            for z_candidate, x_candidate, y_candidate in candidate_positions:
+                x, y = x_candidate, y_candidate
+                
+                # Adjust position to ensure box fits
+                if x + dx > heur.X:
+                    x = heur.X - dx
+                if y + dy > heur.Y:
+                    y = heur.Y - dy
+                if x < 0 or y < 0:
+                    continue
+                
+                if not heur.feasibility.is_within_pallet(x, y, dx, dy):
+                    continue
+                
+                # Compute actual z at this position
+                place_area = pallet[x:x+dx, y:y+dy, :]
+                non_zero = np.any(place_area > 0, axis=(0,1))
+                if np.any(non_zero):
+                    z = int(np.max(np.nonzero(non_zero)) + 1)
+                else:
+                    z = 0
+                
+                # Rule (2): When z==0, only hard boxes on bottom
+                if z == 0 and not box_is_hard:
+                    continue
+                
+                if z + dz > heur.H:
+                    continue
+                
+                # Rule (3): When z>0, allow placement only on hard support
+                if z > 0 and not has_hard_support(x, y, z, dx, dy):
+                    continue
+                
+                # Rule (3): Skip placements that reuse same footprint and increase height
+                if reuses_footprint_and_increases_height(x, y, dx, dy, z):
+                    continue
+                
+                if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
+                    return (slot_i, rot_id, x, y)
+    
+    # Fallback: original scanning if EMS-like fails
+    for slot_i in range(n_slots):
+        if heur.slot_is_empty(obs, slot_i):
+            continue
+        props = heur.get_slot_props(obs, slot_i)
+        size_bins = heur.props_to_size_bins(props)
+        if size_bins.size == 0 or np.any(size_bins <= 0):
+            continue
+        
+        box_is_hard = is_hard_box(slot_i)
+        
+        for rot_id in range(6):
+            rotated = heur.rotate_size_bins(size_bins, rot_id)
+            dx, dy, dz = rotated[0], rotated[1], rotated[2]
+            
+            # Rule (1)
+            sorted_dims = sorted([dx, dy, dz])
+            if dz != sorted_dims[0]:
+                continue
+            
             for x in range(heur.X - dx + 1):
                 for y in range(heur.Y - dy + 1):
-                    # Check if position is empty at bottom layer
-                    place_area = pallet[x:x+dx, y:y+dy, 0]
-                    
-                    # For bottom layer placement, area must be completely empty
-                    if np.any(place_area > 0):
-                        continue
-                    
-                    # Check if box fits within pallet at z=0
                     if not heur.feasibility.is_within_pallet(x, y, dx, dy):
                         continue
                     
-                    # Check if placement at z=0 is feasible
-                    if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, 0):
-                        return (slot_i, rot_id, x, y)
-    
-    # If no hard-box EMS placement found, fall back to lowest feasible hard-box placement
-    # This is the original naive strategy but modified to prefer lower z positions
-    best_action = None
-    best_z = heur.H + 1  # Initialize with worst possible z
-    
-    for slot_i in range(n_slots):
-        if heur.slot_is_empty(obs, slot_i):
-            continue
-        
-        props = heur.get_slot_props(obs, slot_i)
-        size_bins = heur.props_to_size_bins(props)
-        
-        if size_bins.size == 0 or np.any(size_bins <= 0):
-            continue
-        
-        for rot_id in range(6):
-            rotated = heur.rotate_size_bins(size_bins, rot_id)
-            dx, dy, dz = rotated
-            
-            if dx <= 0 or dy <= 0 or dz <= 0:
-                continue
-            
-            if not heur.feasibility.is_within_pallet(0, 0, dx, dy):
-                continue
-            
-            for x in range(heur.X - dx + 1):
-                for y in range(heur.Y - dy + 1):
-                    # Compute z exactly as in env.py
                     place_area = pallet[x:x+dx, y:y+dy, :]
                     non_zero = np.any(place_area > 0, axis=(0,1))
-                    
                     if np.any(non_zero):
                         z = int(np.max(np.nonzero(non_zero)) + 1)
                     else:
                         z = 0
                     
+                    # Rule (2)
+                    if z == 0 and not box_is_hard:
+                        continue
+                    
                     if z + dz > heur.H:
                         continue
                     
+                    # Rule (3)
+                    if z > 0 and not has_hard_support(x, y, z, dx, dy):
+                        continue
+                    
+                    # Rule (3) footprint reuse check
+                    if reuses_footprint_and_increases_height(x, y, dx, dy, z):
+                        continue
+                    
                     if heur.feasibility.is_feasible(pallet, x, y, dx, dy, dz, z):
-                        # Track the action with the lowest z
-                        if z < best_z:
-                            best_z = z
-                            best_action = (slot_i, rot_id, x, y)
+                        return (slot_i, rot_id, x, y)
     
-    if best_action is not None:
-        return best_action
-    
-    # No feasible action found
     return (0, 0, 0, 0)
 
 class ExpertGuidanceSoft(BaseHeuristic):

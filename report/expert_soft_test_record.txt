@@ -1,0 +1,34 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-10_16-15-10
+Heuristics: expert_guidance_soft
+Rounds: 5
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/5 | seed=1747220168 ---
+expert_guidance_soft      util=0.516480  n_boxes= 20  term=term_5
+
+--- Round 2/5 | seed=514443240 ---
+expert_guidance_soft      util=0.232320  n_boxes=  7  term=term_5
+
+--- Round 3/5 | seed=1400167394 ---
+expert_guidance_soft      util=0.608000  n_boxes= 21  term=term_5
+
+--- Round 4/5 | seed=440095528 ---
+expert_guidance_soft      util=0.260480  n_boxes=  9  term=term_5
+
+--- Round 5/5 | seed=420523093 ---
+expert_guidance_soft      util=0.540160  n_boxes= 19  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[expert_guidance_soft]
+  util:    mean=0.431488  var=0.023820
+  n_boxes: mean=15.200000  var=35.360000
+  term_counts: {'term_5': 5}
+
+=== Seeds (one per round) ===
+1747220168, 514443240, 1400167394, 440095528, 420523093
