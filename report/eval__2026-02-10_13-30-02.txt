@@ -1,0 +1,22 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-10_13-30-02
+Heuristics: worker_guidance_specific_soft
+Rounds: 1
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/1 | seed=2029078021 ---
+worker_guidance_specific_soft  util=0.364800  n_boxes= 12  term=unstable
+
+
+=== Summary (mean / variance over rounds) ===
+
+[worker_guidance_specific_soft]
+  util:    mean=0.364800  var=0.000000
+  n_boxes: mean=12.000000  var=0.000000
+  term_counts: {'unstable': 1}
+
+=== Seeds (one per round) ===
+2029078021

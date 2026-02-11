@@ -1,0 +1,84 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-11_12-21-59
+Heuristics: worker_guidance_simple_soft, worker_guidance_specific_soft
+Rounds: 15
+Max steps per episode: 200
+Save video: False
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/15 | seed=442330666 ---
+worker_guidance_simple_soft  util=0.261120  n_boxes=  8  term=unstable
+worker_guidance_specific_soft  util=0.272640  n_boxes=  9  term=unstable
+
+--- Round 2/15 | seed=106742923 ---
+worker_guidance_simple_soft  util=0.691840  n_boxes= 23  term=unstable
+worker_guidance_specific_soft  util=0.224640  n_boxes=  7  term=unstable
+
+--- Round 3/15 | seed=22076912 ---
+worker_guidance_simple_soft  util=0.307200  n_boxes= 10  term=unstable
+worker_guidance_specific_soft  util=0.512640  n_boxes= 17  term=unstable
+
+--- Round 4/15 | seed=1675793575 ---
+worker_guidance_simple_soft  util=0.483200  n_boxes= 16  term=unstable
+worker_guidance_specific_soft  util=0.454400  n_boxes= 15  term=unstable
+
+--- Round 5/15 | seed=1119913586 ---
+worker_guidance_simple_soft  util=0.531840  n_boxes= 17  term=unstable
+worker_guidance_specific_soft  util=0.391040  n_boxes= 12  term=unstable
+
+--- Round 6/15 | seed=1108359238 ---
+worker_guidance_simple_soft  util=0.726400  n_boxes= 27  term=term_5
+worker_guidance_specific_soft  util=0.279040  n_boxes= 11  term=unstable
+
+--- Round 7/15 | seed=621479731 ---
+worker_guidance_simple_soft  util=0.491520  n_boxes= 15  term=unstable
+worker_guidance_specific_soft  util=0.557440  n_boxes= 17  term=unstable
+
+--- Round 8/15 | seed=1676960965 ---
+worker_guidance_simple_soft  util=0.581760  n_boxes= 20  term=unstable
+worker_guidance_specific_soft  util=0.255360  n_boxes=  8  term=unstable
+
+--- Round 9/15 | seed=2132399679 ---
+worker_guidance_simple_soft  util=0.586240  n_boxes= 18  term=unstable
+worker_guidance_specific_soft  util=0.296320  n_boxes=  9  term=unstable
+
+--- Round 10/15 | seed=1392217927 ---
+worker_guidance_simple_soft  util=0.452480  n_boxes= 15  term=unstable
+worker_guidance_specific_soft  util=0.273280  n_boxes=  8  term=unstable
+
+--- Round 11/15 | seed=539071382 ---
+worker_guidance_simple_soft  util=0.528640  n_boxes= 16  term=unstable
+worker_guidance_specific_soft  util=0.314240  n_boxes=  9  term=unstable
+
+--- Round 12/15 | seed=501351834 ---
+worker_guidance_simple_soft  util=0.491520  n_boxes= 15  term=unstable
+worker_guidance_specific_soft  util=0.592000  n_boxes= 19  term=unstable
+
+--- Round 13/15 | seed=1277932278 ---
+worker_guidance_simple_soft  util=0.444160  n_boxes= 15  term=unstable
+worker_guidance_specific_soft  util=0.227840  n_boxes=  7  term=unstable
+
+--- Round 14/15 | seed=2113708699 ---
+worker_guidance_simple_soft  util=0.500480  n_boxes= 17  term=unstable
+worker_guidance_specific_soft  util=0.448640  n_boxes= 15  term=unstable
+
+--- Round 15/15 | seed=253923079 ---
+worker_guidance_simple_soft  util=0.491520  n_boxes= 13  term=unstable
+worker_guidance_specific_soft  util=0.545280  n_boxes= 15  term=unstable
+
+
+=== Summary (mean / variance over rounds) ===
+
+[worker_guidance_simple_soft]
+  util:    mean=0.504661  var=0.013587
+  n_boxes: mean=16.333333  var=20.222222
+  term_counts: {'term_5': 1, 'unstable': 14}
+
+[worker_guidance_specific_soft]
+  util:    mean=0.376320  var=0.015918
+  n_boxes: mean=11.866667  var=15.715556
+  term_counts: {'unstable': 15}
+
+=== Seeds (one per round) ===
+442330666, 106742923, 22076912, 1675793575, 1119913586, 1108359238, 621479731, 1676960965, 2132399679, 1392217927, 539071382, 501351834, 1277932278, 2113708699, 253923079

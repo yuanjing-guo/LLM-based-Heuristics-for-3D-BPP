@@ -1,0 +1,10 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-10_16-14-35
+Heuristics: expert_guidance_soft
+Rounds: 5
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/5 | seed=133468715 ---

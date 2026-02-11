@@ -1,0 +1,64 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-11_15-04-25
+Heuristics: expert_guidance
+Rounds: 15
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/15 | seed=702670066 ---
+expert_guidance           util=0.664960  n_boxes= 23  term=unstable
+
+--- Round 2/15 | seed=1279277023 ---
+expert_guidance           util=0.709120  n_boxes= 24  term=term_5
+
+--- Round 3/15 | seed=2026513012 ---
+expert_guidance           util=0.679040  n_boxes= 24  term=term_5
+
+--- Round 4/15 | seed=1578794928 ---
+expert_guidance           util=0.636800  n_boxes= 22  term=unstable
+
+--- Round 5/15 | seed=91179512 ---
+expert_guidance           util=0.737280  n_boxes= 27  term=unstable
+
+--- Round 6/15 | seed=690714690 ---
+expert_guidance           util=0.612480  n_boxes= 21  term=unstable
+
+--- Round 7/15 | seed=1253645872 ---
+expert_guidance           util=0.757120  n_boxes= 29  term=term_5
+
+--- Round 8/15 | seed=1444691344 ---
+expert_guidance           util=0.616960  n_boxes= 21  term=unstable
+
+--- Round 9/15 | seed=1005381161 ---
+expert_guidance           util=0.715520  n_boxes= 26  term=term_5
+
+--- Round 10/15 | seed=1028834922 ---
+expert_guidance           util=0.672640  n_boxes= 25  term=term_5
+
+--- Round 11/15 | seed=182599945 ---
+expert_guidance           util=0.682240  n_boxes= 24  term=unstable
+
+--- Round 12/15 | seed=1782176633 ---
+expert_guidance           util=0.684800  n_boxes= 25  term=term_5
+
+--- Round 13/15 | seed=1191451056 ---
+expert_guidance           util=0.673920  n_boxes= 21  term=unstable
+
+--- Round 14/15 | seed=263949086 ---
+expert_guidance           util=0.562560  n_boxes= 18  term=unstable
+
+--- Round 15/15 | seed=915904999 ---
+expert_guidance           util=0.632960  n_boxes= 22  term=unstable
+
+
+=== Summary (mean / variance over rounds) ===
+
+[expert_guidance]
+  util:    mean=0.669227  var=0.002423
+  n_boxes: mean=23.466667  var=7.182222
+  term_counts: {'term_5': 6, 'unstable': 9}
+
+=== Seeds (one per round) ===
+702670066, 1279277023, 2026513012, 1578794928, 91179512, 690714690, 1253645872, 1444691344, 1005381161, 1028834922, 182599945, 1782176633, 1191451056, 263949086, 915904999

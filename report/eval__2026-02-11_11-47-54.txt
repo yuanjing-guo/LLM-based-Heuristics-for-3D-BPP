@@ -1,0 +1,31 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-11_11-47-54
+Heuristics: expert_guidance_soft
+Rounds: 15
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/15 | seed=2059071791 ---
+expert_guidance_soft      util=0.483840  n_boxes= 16  term=term_5
+
+--- Round 2/15 | seed=1053512624 ---
+expert_guidance_soft      util=0.535680  n_boxes= 18  term=term_5
+
+--- Round 3/15 | seed=245642177 ---
+expert_guidance_soft      util=0.200960  n_boxes=  7  term=term_5
+
+--- Round 4/15 | seed=131687894 ---
+expert_guidance_soft      util=0.433920  n_boxes= 17  term=unstable
+
+--- Round 5/15 | seed=1570748931 ---
+expert_guidance_soft      util=0.513280  n_boxes= 19  term=term_5
+
+--- Round 6/15 | seed=393633590 ---
+expert_guidance_soft      util=0.075520  n_boxes=  3  term=term_5
+
+--- Round 7/15 | seed=1544850745 ---
+expert_guidance_soft      util=0.367360  n_boxes= 13  term=term_5
+
+--- Round 8/15 | seed=705494589 ---

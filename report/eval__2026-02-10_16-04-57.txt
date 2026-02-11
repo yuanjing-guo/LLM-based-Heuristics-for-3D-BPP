@@ -1,0 +1,44 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-10_16-04-57
+Heuristics: before_training, expert_guidance_soft
+Rounds: 5
+Max steps per episode: 200
+Save video: False
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/5 | seed=1854512259 ---
+before_training           util=0.329600  n_boxes= 13  term=unstable
+expert_guidance_soft      util=0.451200  n_boxes= 18  term=term_5
+
+--- Round 2/5 | seed=266775240 ---
+before_training           util=0.405760  n_boxes= 15  term=unstable
+expert_guidance_soft      util=0.382720  n_boxes= 14  term=unstable
+
+--- Round 3/5 | seed=621692432 ---
+before_training           util=0.693760  n_boxes= 25  term=term_5
+expert_guidance_soft      util=0.408960  n_boxes= 15  term=term_5
+
+--- Round 4/5 | seed=1890772957 ---
+before_training           util=0.305920  n_boxes= 10  term=unstable
+expert_guidance_soft      util=0.421760  n_boxes= 15  term=term_5
+
+--- Round 5/5 | seed=2137475023 ---
+before_training           util=0.373760  n_boxes= 14  term=unstable
+expert_guidance_soft      util=0.542080  n_boxes= 20  term=term_5
+
+
+=== Summary (mean / variance over rounds) ===
+
+[before_training]
+  util:    mean=0.421760  var=0.019691
+  n_boxes: mean=15.400000  var=25.840000
+  term_counts: {'term_5': 1, 'unstable': 4}
+
+[expert_guidance_soft]
+  util:    mean=0.441344  var=0.003023
+  n_boxes: mean=16.400000  var=5.040000
+  term_counts: {'term_5': 4, 'unstable': 1}
+
+=== Seeds (one per round) ===
+1854512259, 266775240, 621692432, 1890772957, 2137475023

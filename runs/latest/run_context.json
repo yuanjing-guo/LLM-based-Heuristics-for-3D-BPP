@@ -1,5 +1,5 @@
 {
-  "physics_mode": "soft",
+  "physics_mode": "rigid",
   "expose_physics_obs": true,
   "X": 25,
   "Y": 25,
@@ -63,7 +63,7 @@
   },
   "seed": 0,
   "max_steps": 200,
-  "arg_soft": true,
+  "arg_soft": false,
   "arg_expose_physics_obs": true,
   "task_config": {
     "buffer_size": 1,

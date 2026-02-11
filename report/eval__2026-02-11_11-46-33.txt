@@ -1,0 +1,64 @@
+=== Batch Evaluation Report ===
+Time: 2026-02-11_11-46-33
+Heuristics: expert_guidance_soft
+Rounds: 15
+Max steps per episode: 200
+Save video: True
+physics_mode: soft
+physics_obs: on
+
+--- Round 1/15 | seed=1190338758 ---
+expert_guidance_soft      util=0.396160  n_boxes= 15  term=unstable
+
+--- Round 2/15 | seed=1337768337 ---
+expert_guidance_soft      util=0.097920  n_boxes=  5  term=term_5
+
+--- Round 3/15 | seed=1979244826 ---
+expert_guidance_soft      util=0.501760  n_boxes= 18  term=unstable
+
+--- Round 4/15 | seed=1817075635 ---
+expert_guidance_soft      util=0.486400  n_boxes= 18  term=term_5
+
+--- Round 5/15 | seed=1927350907 ---
+expert_guidance_soft      util=0.415360  n_boxes= 16  term=term_5
+
+--- Round 6/15 | seed=868613338 ---
+expert_guidance_soft      util=0.332800  n_boxes= 12  term=unstable
+
+--- Round 7/15 | seed=496681809 ---
+expert_guidance_soft      util=0.556160  n_boxes= 20  term=unstable
+
+--- Round 8/15 | seed=534858058 ---
+expert_guidance_soft      util=0.333440  n_boxes= 14  term=unstable
+
+--- Round 9/15 | seed=1751700936 ---
+expert_guidance_soft      util=0.467200  n_boxes= 17  term=term_5
+
+--- Round 10/15 | seed=1193142730 ---
+expert_guidance_soft      util=0.479360  n_boxes= 16  term=term_5
+
+--- Round 11/15 | seed=541568366 ---
+expert_guidance_soft      util=0.300160  n_boxes= 12  term=term_5
+
+--- Round 12/15 | seed=981993843 ---
+expert_guidance_soft      util=0.407680  n_boxes= 14  term=term_5
+
+--- Round 13/15 | seed=282919474 ---
+expert_guidance_soft      util=0.533760  n_boxes= 20  term=term_5
+
+--- Round 14/15 | seed=534310265 ---
+expert_guidance_soft      util=0.221440  n_boxes=  9  term=term_5
+
+--- Round 15/15 | seed=678876602 ---
+expert_guidance_soft      util=0.645760  n_boxes= 23  term=unstable
+
+
+=== Summary (mean / variance over rounds) ===
+
+[expert_guidance_soft]
+  util:    mean=0.411691  var=0.018108
+  n_boxes: mean=15.266667  var=19.528889
+  term_counts: {'term_5': 9, 'unstable': 6}
+
+=== Seeds (one per round) ===
+1190338758, 1337768337, 1979244826, 1817075635, 1927350907, 868613338, 496681809, 534858058, 1751700936, 1193142730, 541568366, 981993843, 282919474, 534310265, 678876602

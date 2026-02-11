@@ -1,0 +1,12 @@
+consider the softness while maximize the spce util
+
+mandatory horizontal placement
+forbid same-footprint stacking
+
+
+
+Revise the policy with these strict infeasibility rules: (1) only allow horizontal placements at all layers,skip any rotation where the largest face is not parallel to the pallet; (2) when z==0, skip placements of soft boxes in buffer so only hard boxes may be placed on the bottom; if no hard box in buffer,then place soft boxes on a hard one.(3) when z>0, allow placement only on hard support at layer z−1 and skip placements that reuse the same (x,y) footprint and increase height.(5)refer to some handcrafted heuristic like ems to generate the space to place, maximize the space util
+
+Revise the policy with these strict infeasibility rules: (1) only allow horizontal placements at all layers,skip any rotation where the largest face is not parallel to the pallet; (2) when z==0, skip placements of soft boxes in buffer so only hard boxes may be placed on the bottom; if no hard box in buffer,then place soft boxes on a hard one.(3) when z>0, allow placement only on hard support at layer z−1 and skip placements that reuse the same (x,y) footprint and increase height.(5)refer to some handcrafted heuristic like ems to generate the space to place, maximize the space util
+
+Revise the policy with these strict infeasibility rules: (1) only allow horizontal placements at all layers,skip any rotation where the largest face is not parallel to the pallet; (2) when z==0, skip placements of soft boxes in buffer so only hard boxes may be placed on the bottom; if no hard box in buffer,then place soft boxes on a hard one.(3) when z>0,  skip placements that reuse the same (x,y) footprint and increase height, and refer to some handcrafted heuristic like ems to generate the candidate space to place, maximize the space util
