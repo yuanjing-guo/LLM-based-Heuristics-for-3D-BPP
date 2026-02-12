@@ -8,6 +8,7 @@ from core.registry import build_registry
 from core.runner import run_episode, format_run_banner
 from heuristics.dummy_mixed_remove import DummyMixedRemove
 from heuristics.test_height_debug import TestHeightDebug
+from heuristics.llm_archives import worked1
 
 
 # ------------------------------------------------------------
@@ -18,6 +19,7 @@ HEURISTIC_REGISTRY = {
     "dummy_mixed": DummyMixed,
     "dummy_mixed_remove": DummyMixedRemove,
     "test_height_debug": TestHeightDebug,
+    "worked1": worked1,
 }
 
 
@@ -49,7 +51,7 @@ def parse_args(all_heuristics):
         ),
     )
 
-    parser.add_argument("--max_steps", type=int, default=200)
+    parser.add_argument("--max_steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=0)
 
     # -------- Runtime env switches --------

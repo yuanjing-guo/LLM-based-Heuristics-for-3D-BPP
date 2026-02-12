@@ -245,5 +245,14 @@ class ArchivedHeuristic(BaseHeuristic):
         super().__init__()
 
     def __call__(self, obs):
-        box_slot, rot_id, x, y = llm_policy(self, obs)
-        return self.encode_action_logits(box_slot, rot_id, x, y)
+        out = llm_policy(self, obs)
+        if isinstance(out, (list, tuple, np.ndarray)):
+            out = list(out)
+        else:
+            out = [out]
+
+        while len(out) < 5:
+            out.append(0)
+        out = out[:5]
+
+        return np.array([int(v) for v in out], dtype=np.int32)

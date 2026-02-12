@@ -510,3 +510,4 @@ class GeneratedHeuristic(BaseHeuristic):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(template)
+

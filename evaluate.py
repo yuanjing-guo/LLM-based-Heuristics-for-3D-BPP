@@ -8,22 +8,23 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 
 from envs.mixed_env import BoxPlanningEnvWrapper, compute_utilization_volume
-from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
-from heuristics.floor_building import FloorBuilding
-from heuristics.llm_entry import LLMBasedHeuristic
-from heuristics.empty_maximal_spaces import EMSOnline
-from heuristics.extreme_point import ExtremePointPhysicsAware
-
+# from heuristics.largest_volume_lowest_z import LargestVolumeLowestZ
+# from heuristics.floor_building import FloorBuilding
+# from heuristics.llm_entry import LLMBasedHeuristic
+# from heuristics.empty_maximal_spaces import EMSOnline
+# from heuristics.extreme_point import ExtremePointPhysicsAware
+from heuristics.llm_archives import worked1
 
 # ------------------------------------------------------------
 # Heuristic registry
 # ------------------------------------------------------------
 HEURISTIC_REGISTRY = {
-    "largest_volume_lowest_z": LargestVolumeLowestZ,
-    "floor_building": FloorBuilding,
-    "llm_based": LLMBasedHeuristic,
-    "empty_maximal_space": EMSOnline,
-    "extreme_point": ExtremePointPhysicsAware,
+    # "largest_volume_lowest_z": LargestVolumeLowestZ,
+    # "floor_building": FloorBuilding,
+    # "llm_based": LLMBasedHeuristic,
+    # "empty_maximal_space": EMSOnline,
+    # "extreme_point": ExtremePointPhysicsAware,
+    "worked1": worked1
 }
 
 
@@ -148,7 +149,7 @@ def main():
         required=True,
         help="Number of rounds (each round uses a new random seed; all heuristics share that seed)",
     )
-    parser.add_argument("--max_steps", type=int, default=200)
+    parser.add_argument("--max_steps", type=int, default=150)
     parser.add_argument("--save_video", action="store_true", help="Save a video for each episode (slow, large)")
     parser.add_argument("--report_dir", type=str, default="report")
 

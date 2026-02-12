@@ -92,7 +92,7 @@ Core palletization environment.
 Executes actions exactly as provided by heuristics
 
 run.py:  
-Main entry point for running experiments.  
+Main entry point for running experime200nts.  
 Most users only need to run this file.
 
 heuristics/  

@@ -19,10 +19,10 @@ class TaskConfig:
     class box:
         n_properties = 4
         type_dict = {
-            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 1.8, "count": 10, "material":lightwood},
+            1: {"size":(0.03, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 2.8, "count": 10, "material":lightwood},
             2: {"size":(0.04, 0.03, 0.03), "friction":(1.0, 0.005, 0.0001), "density":500, "softness": 0.2, "count": 10, "material":darkwood},
             3: {"size":(0.04, 0.04, 0.03), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 0.2, "count": 10, "material":darkwood},
-            4: {"size":(0.04, 0.04, 0.04), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 1.8, "count": 10, "material":lightwood},
+            4: {"size":(0.04, 0.04, 0.04), "friction":(1.0, 0.005, 0.0001), "density":5000, "softness": 2.8, "count": 10, "material":lightwood},
         }
         # 48 * 10 + 64 * 10 + 27 * 5 + 48 * 10 + 64 * 10
         n_type = len(type_dict)
