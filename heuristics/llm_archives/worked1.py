@@ -2,6 +2,7 @@ import numpy as np
 from heuristics.base import BaseHeuristic
 
 def llm_policy(heur, obs):
+    
     # Initialize persistent state
     if not hasattr(llm_policy, '_base_lock'):
         llm_policy._base_lock = 0
@@ -13,8 +14,6 @@ def llm_policy(heur, obs):
         llm_policy._rm_cd = {}
     if not hasattr(llm_policy, '_fail_count'):
         llm_policy._fail_count = 0
-    if not hasattr(llm_policy, '_stop_height'):
-        llm_policy._stop_height = heur.H  # Default to max height
     
     # Update state
     llm_policy._base_lock = max(0, llm_policy._base_lock - 1)
@@ -24,7 +23,8 @@ def llm_policy(heur, obs):
             del llm_policy._rm_cd[k]
     
     # Helper: check if action is in recent history
-    in_recent = lambda action, lookback=4: any(tuple(action) == tuple(a) for a in llm_policy._recent[-lookback:]) if llm_policy._recent else False
+    def in_recent(action, lookback=4):
+        return any(tuple(action) == tuple(a) for a in llm_policy._recent[-lookback:])
     
     # Helper: get physics info
     physics_informative = ('buffer_physics' in obs) and ('pallet_obs_softness' in obs) and \
@@ -42,8 +42,6 @@ def llm_policy(heur, obs):
     # Helper: get bottom soft footprints
     def get_bottom_soft_footprints():
         soft_footprints = []
-        if not physics_informative:
-            return soft_footprints
         pallet_count = obs['pallet_count']
         for i in range(pallet_count):
             fx, fy, fz, fdx, fdy, fdz = obs['pallet_footprints'][i]
@@ -55,7 +53,7 @@ def llm_policy(heur, obs):
                 soft_footprints.append((i, fx, fy, fdx, fdy))
         return soft_footprints
     
-    # Helper: find legal placements with stop height mechanism
+    # Helper: find legal placements
     def find_placements(require_hard=False, require_z0=False, require_overlap_pending=False):
         placements = []
         N = len(obs['front_ids'])
@@ -86,10 +84,6 @@ def llm_policy(heur, obs):
                         if require_z0 and z != 0:
                             continue
                         if z + dz > heur.H:
-                            continue
-                        
-                        # STOP MECHANISM: Skip if placement would exceed stop height
-                        if z + dz > llm_policy._stop_height:
                             continue
                         
                         # Check overlap with pending region
@@ -253,13 +247,8 @@ def llm_policy(heur, obs):
                 llm_policy._fail_count = 0
                 return action
     
-    # No placement found - activate stop mechanism
+    # No placement found
     llm_policy._fail_count += 1
-    
-    # If we've failed to find placements multiple times, lower stop height
-    if llm_policy._fail_count >= 3 and llm_policy._stop_height > 0:
-        llm_policy._stop_height -= 1
-        llm_policy._fail_count = 0  # Reset to try again with new height
     
     # General REMOVE
     remove_allowed = (strict_online and llm_policy._fail_count >= 1) or \
@@ -280,18 +269,12 @@ def llm_policy(heur, obs):
     # Last resort
     return (0, 0, 0, 0, 0)
 
-class GeneratedHeuristic(BaseHeuristic):
-    name = "llm_generated"
+class ArchivedHeuristic(BaseHeuristic):
+    name = "worked1"
+
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, obs):
-        out = llm_policy(self, obs)
-        if isinstance(out, (list, tuple, np.ndarray)):
-            out = list(out)
-        else:
-            out = [out]
-
-        while len(out) < 5:
-            out.append(0)
-        out = out[:5]
-
-        return np.array([int(v) for v in out], dtype=np.int32)
+        box_slot, rot_id, x, y = llm_policy(self, obs)
+        return self.encode_action_logits(box_slot, rot_id, x, y)

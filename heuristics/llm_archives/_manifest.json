@@ -131,6 +131,28 @@
         "physics_mode": "soft",
         "physics_obs": "on"
       }
+    },
+    {
+      "name": "success",
+      "file": "heuristics/llm_archives/success.py",
+      "saved_at": "2026-02-12 15:30:47",
+      "meta": {
+        "seed": 2,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
+    },
+    {
+      "name": "worked1",
+      "file": "heuristics/llm_archives/worked1.py",
+      "saved_at": "2026-02-12 16:35:24",
+      "meta": {
+        "seed": 5,
+        "max_steps": 200,
+        "physics_mode": "soft",
+        "physics_obs": "on"
+      }
     }
   ]
 }

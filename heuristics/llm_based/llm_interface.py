@@ -4,7 +4,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 
-def call_llm(api_url: str, api_key: str, model: str, prompt: str, timeout: int = 60) -> Optional[str]:
+def call_llm(api_url: str, api_key: str, model: str, prompt: str, timeout: int = 200) -> Optional[str]:
     
     #地址
     #这是HTTP请求头，用来告诉服务器“谁在请求、发的是什么数据”

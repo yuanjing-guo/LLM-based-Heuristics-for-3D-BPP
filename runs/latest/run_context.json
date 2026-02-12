@@ -61,7 +61,7 @@
     "4": "invalid_slot (box_slot >= remaining)",
     "5": "height_oob"
   },
-  "seed": 0,
+  "seed": 5,
   "max_steps": 200,
   "arg_soft": true,
   "arg_expose_physics_obs": true,

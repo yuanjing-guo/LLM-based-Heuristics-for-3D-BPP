@@ -208,7 +208,7 @@ def _validate_generated_code(code: str) -> List[str]:
 
 
 # ============================================================
-# Prompt builder (SIMPLIFIED & SECTIONED)
+# Prompt builder (FULL + STABILITY CONTROL INSERTED)
 # ============================================================
 
 def build_prompt(
@@ -235,6 +235,7 @@ def build_prompt(
         "- pallet = obs['pallet_obs_density']  # float32 array shape (X,Y,H)\n"
         "- obs['buffer'] is 1D flat length N*heur.n_properties  (NOT 2D)\n"
         "- obs['front_ids']  # length N\n"
+        "- N = len(obs['front_ids'])\n"
         "- obs['pallet_count']  # int\n"
         "- obs['pallet_footprints']  # list length pallet_count; fp=(x,y,z,dx,dy,dz)\n"
         "- obs['pallet_ids']  # list length pallet_count\n"
@@ -248,6 +249,11 @@ def build_prompt(
         "- NEVER invent obs keys (e.g., do NOT use obs['physics_obs']).\n"
         "- NEVER index obs['buffer'] as 2D (no buffer[slot,:]). Use heur.get_slot_props(obs, slot).\n"
         "- Use ONLY heur.X, heur.Y, heur.H, heur.n_properties.\n"
+        "\n"
+        "VALID SLOT RULE (CRITICAL):\n"
+        "- A slot is valid ONLY if obs['front_ids'][slot] != 0.\n"
+        "- NEVER call heur.get_slot_props(obs, slot) on an empty slot.\n"
+        "- Always check obs['front_ids'][slot] != 0 BEFORE computing props/size_bins.\n"
     )
 
     # ============================================================
@@ -261,6 +267,7 @@ def build_prompt(
         "You may use inline variables, inline loops, and small lambdas.\n"
         "\n"
         "READ SLOT PROPS (ONLY THIS WAY):\n"
+        "  if obs['front_ids'][slot] == 0: continue\n"
         "  props = heur.get_slot_props(obs, slot)\n"
         "  size_bins = heur.props_to_size_bins(props)\n"
         "  dx, dy, dz = [int(v) for v in heur.rotate_size_bins(size_bins, rot_id)]\n"
@@ -296,7 +303,7 @@ def build_prompt(
     )
 
     # ============================================================
-    # 3) STRATEGY (YOUR GOAL IMPLEMENTED AS STATE MACHINE)
+    # 3) STRATEGY (BUFFER-AWARE + STABILITY CONTROL)
     # ============================================================
     strategy_block = (
         "=== 3) STRATEGY (IMPLEMENT EXACTLY, AS A PRIORITIZED STATE MACHINE) ===\n"
@@ -304,28 +311,69 @@ def build_prompt(
         "  Final bottom layer (z==0) should become ALL HARD.\n"
         "Upper layers (z>0): NO hard/soft constraints; place anything legal.\n"
         "\n"
+        "BUFFER-AWARE RULES (CRITICAL):\n"
+        "- Let N = len(obs['front_ids']).\n"
+        "- If N == 1, you are in STRICT ONLINE MODE (no waiting for future boxes).\n"
+        "\n"
+        "STABILITY CONTROL (MANDATORY, TO PREVENT PENDING OSCILLATION):\n"
+        "- Maintain llm_policy._base_lock (int) persistent state.\n"
+        "- After a successful Phase B placement (i.e., you placed something overlapping pending_base at z==0):\n"
+        "    set llm_policy._base_lock = (3 if N>1 else 1).\n"
+        "- On every step: if _base_lock > 0, decrement it by 1.\n"
+        "- While _base_lock > 0:\n"
+        "    * DO NOT execute Phase A (skip it completely).\n"
+        "    * You may still do Phase B (if pending exists) or Phase C.\n"
+        "\n"
+        "STRICT PHASE-A TRIGGER (AVOID THRASHING):\n"
+        "- Execute Phase A only if ALL are true:\n"
+        "    * physics_informative is True\n"
+        "    * bottom soft exists (as defined below)\n"
+        "    * _base_lock == 0\n"
+        "    * AND there exists at least one HARD valid buffer slot now:\n"
+        "        exists slot with obs['front_ids'][slot]!=0 and HARD\n"
+        "\n"
+        "STRICT ONLINE MODE (N == 1):\n"
+        "- You cannot wait for future HARD arrivals.\n"
+        "- Never stall because a preferred HARD is unavailable.\n"
+        "- Pending memory must be short: when you set llm_policy._pending_base, use ttl=2.\n"
+        "- General REMOVE rule changes:\n"
+        "    * If NO legal PLACE exists for any valid slot, REMOVE immediately (if any removable exists).\n"
+        "    * Do NOT require 2 consecutive failures.\n"
+        "- Pending fill rule changes:\n"
+        "    * Try HARD-first for z==0.\n"
+        "    * If no HARD-bottom placement exists now, allow SOFT-bottom placement (do NOT stall).\n"
+        "\n"
+        "NORMAL MODE (N > 1):\n"
+        "- Use the full 3-phase strategy below as-is.\n"
+        "- Pending ttl should be 10.\n"
+        "- Only do general REMOVE when you failed to find any PLACE for 2 consecutive steps.\n"
+        "\n"
         "You MUST implement THREE PHASES (A then B then C). Execute the first applicable phase each step.\n"
         "\n"
         "PHASE A: BASE-HARDIFY (replacement)\n"
         "Condition:\n"
-        "- physics_informative is True\n"
-        "- buffer contains at least one HARD non-empty slot\n"
-        "- pallet bottom contains at least one SOFT footprint (a footprint with fz==0 whose region in pallet_obs_softness\n"
-        "  inside that footprint has mean > 0.5)\n"
+        "- (must satisfy STRICT PHASE-A TRIGGER above)\n"
+        "- pallet bottom contains at least one SOFT footprint:\n"
+        "    a footprint with fz==0 whose region in pallet_obs_softness inside that footprint has mean > 0.5\n"
         "Action:\n"
         "A1) If a bottom-soft footprint index i is directly removable (removable_mask[i]>0), REMOVE it.\n"
         "    After removing it, store memory:\n"
-        "      llm_policy._pending_base = (fx, fy, fdx, fdy, ttl=10)\n"
+        "      llm_policy._pending_base = (fx, fy, fdx, fdy, ttl)\n"
+        "    where ttl = 2 if N==1 else 10.\n"
         "A2) Else (bottom soft not removable): REMOVE a removable blocker ABOVE it (fz>0) that overlaps its XY.\n"
-        "    Prefer: higher top height (fz+fdz), then larger overlap. This uncovers the bottom soft.\n"
+        "    Prefer: higher top height (fz+fdz), then larger overlap.\n"
         "\n"
-        "PHASE B: FILL PENDING HOLE WITH HARD (immediate replacement)\n"
+        "PHASE B: FILL PENDING HOLE (immediate replacement)\n"
         "Condition:\n"
         "- llm_policy._pending_base exists\n"
         "Action:\n"
-        "- Try to PLACE a HARD box at z==0 that overlaps the pending region.\n"
+        "- Try to PLACE a box at z==0 that overlaps the pending region.\n"
         "- ONLY accept placements where computed z==0.\n"
-        "- ONLY consider HARD boxes.\n"
+        "- In NORMAL MODE (N>1): ONLY consider HARD boxes.\n"
+        "- In STRICT ONLINE MODE (N==1): try HARD boxes first; if none works, allow SOFT boxes.\n"
+        "- On success:\n"
+        "    * clear pending_base\n"
+        "    * set _base_lock as specified in STABILITY CONTROL\n"
         "- When ttl expires, clear pending.\n"
         "\n"
         "PHASE C: NORMAL PLACEMENT\n"
@@ -341,7 +389,8 @@ def build_prompt(
         "ANTI-OSCILLATION (required but simple):\n"
         "- Keep llm_policy._recent: last 8 actions; reject candidates that appear in last 4.\n"
         "- Keep llm_policy._rm_cd cooldown dict: after REMOVE(i) set cooldown[i]=3; decrement each step.\n"
-        "- Only do general REMOVE (outside Phase A) when you failed to find any PLACE for 2 consecutive steps.\n"
+        "- In NORMAL MODE (N>1): only do general REMOVE (outside Phase A) when you failed to find any PLACE for 2 consecutive steps.\n"
+        "- In STRICT ONLINE MODE (N==1): do general REMOVE immediately when no PLACE exists.\n"
         "\n"
         "LAST RESORT:\n"
         "- If absolutely no legal PLACE and no legal REMOVE: return PLACE(0,0,0,0,0).\n"
@@ -402,40 +451,6 @@ def build_prompt(
         + "\n\nRevise the code accordingly while keeping ALL rules.\n"
     )
 
-    base = (
-        ctx_block
-        + "\n"
-        + interface_block
-        + "\n"
-        + allowed_block
-        + "\n"
-        + strategy_block
-        + "\n"
-        + output_block
-    )
-
-    if feedback_history:
-        items = [str(x).strip() for x in feedback_history if str(x).strip()]
-        if items:
-            base = (
-                "HARD CONSTRAINTS FROM HISTORY (must satisfy):\n- "
-                + "\n- ".join(items)
-                + "\n\n"
-                + base
-            )
-
-    if not previous_code:
-        return base + "\nStart from scratch.\n"
-
-    return (
-        base
-        + "\nPrevious version:\n"
-        + previous_code
-        + "\n\nHuman feedback for this revision:\n"
-        + (feedback or "")
-        + "\n\nRevise the code accordingly while keeping ALL rules.\n"
-    )
-
 
 # ============================================================
 # Generate
@@ -460,6 +475,7 @@ def generate_heuristic(
 
     code = _extract_code(content)
 
+    # Recommended to re-enable once you're iterating on behavior, not syntax:
     # errs = _validate_generated_code(code)
     # if errs:
     #     print("[LLM][VALIDATION FAILED] refusing to write heuristic:")
